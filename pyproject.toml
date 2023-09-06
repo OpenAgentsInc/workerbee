@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "ai-worker"
+version = "0.1.0"
+description = "api server that posts capabilities, and accepts jobs"
+authors = ["erik aronesty <erik@q32.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "ai_worker"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+llama-cpp-python = {extras = ["server"], version = "^0.1.83"}
+pydantic-settings = "^2.0.3"
+fastapi = "^0.103.1"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
