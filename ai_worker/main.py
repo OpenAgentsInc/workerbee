@@ -1,10 +1,13 @@
 import argparse
 import asyncio
 import json
+import multiprocessing
 import os
 from typing import Optional
+import logging as log
 
 import httpx
+import psutil
 import sseclient
 import websockets
 from llama_cpp.server.app import Settings as LlamaSettings, create_app as create_llama_app
@@ -61,21 +64,31 @@ class WorkerMain:
         self.llama_cli = TestClient(self.llama)
 
     @staticmethod
-    def connect_message():
-        nv = nvidia_smi.getInstance()
-        dq = nv.DeviceQuery()
+    def connect_message() -> str:
+        ret = dict(
+            cpu_count=multiprocessing.cpu_count(),
+            vram=psutil.virtual_memory().available
+        )
 
-        return json.dumps(dict(
-            nv_gpu_count=dq.get("count"),
-            nv_driver_version=dq.get("driver_version"),
-            nv_gpus=[
-                dict(
-                    name=g.get("product_name"),
-                    uuid=g.get("uuid"),
-                    memory=g.get("fb_memory_usage", {}).get("total")
-                ) for g in dq.get("gpu", [])
-            ]
-        ))
+        try:
+            nv = nvidia_smi.getInstance()
+            dq = nv.DeviceQuery()
+            ret.update(dict(
+                nv_gpu_count=dq.get("count"),
+                nv_driver_version=dq.get("driver_version"),
+                nv_gpus=[
+                    dict(
+                        name=g.get("product_name"),
+                        uuid=g.get("uuid"),
+                        memory=g.get("fb_memory_usage", {}).get("total")
+                    ) for g in dq.get("gpu", [])
+                ]
+            ))
+        except Exception as ex:
+            log.debug("no nvidia: %s", ex)
+            pass
+
+        return json.dumps(ret)
 
     async def run_ws(self, ws):
         await ws.send(self.connect_message())
