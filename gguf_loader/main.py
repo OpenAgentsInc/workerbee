@@ -22,7 +22,12 @@ def convert_to_gguf(file):
     return dest
 
 
-def download_gguf(name):
+def get_size(name):
+    typ, hf, fil = pick_file(name)
+    return fil["size"]
+
+
+def pick_file(name):
     parts = name.split(":", 1)
     if len(parts) == 1:
         hf, filt = parts[0], ""
@@ -50,25 +55,31 @@ def download_gguf(name):
             # this is all heuristics, but, imo it can be more than good enough
             raise ValueError("Need ggml or gguf")
 
-        base = os.path.basename(ggml[0]["name"])
-
-        log.debug("downloading...")
-
-        # use hf so we get a nice cache
-        path = hf_hub_download(repo_id=hf, filename=base, resume_download=True)
-
-        return convert_to_gguf(path)
+        return "ggml", hf, ggml[0]
 
     if len(gguf) > 1:
         raise ValueError("Multiple files match, please specify a better filter")
 
-    base = os.path.basename(gguf[0]["name"])
+    return "gguf", hf, gguf[0]
+
+
+def download_gguf(name):
+    typ, repo_id, fil = pick_file(name)
+    if typ == "ggml":
+        base = os.path.basename(fil["name"])
+        log.debug("downloading...")
+        # use hf so we get a nice cache
+        path = hf_hub_download(repo_id=repo_id, filename=base, resume_download=True)
+        return convert_to_gguf(path)
+
+    base = os.path.basename(fil["name"])
     log.debug("downloading...")
-    return hf_hub_download(repo_id=hf, filename=base)
+    return hf_hub_download(repo_id=repo_id, filename=base)
 
 
 # Load environment variables from .env file
 load_dotenv()
+
 
 # Get AWS credentials from environment variables
 

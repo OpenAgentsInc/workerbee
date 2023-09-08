@@ -2,11 +2,9 @@ import argparse
 import asyncio
 import json
 import multiprocessing
-import os
 from typing import Optional
 import logging as log
 
-import httpx
 import psutil
 import sseclient
 import websockets
@@ -17,9 +15,10 @@ from pynvml.smi import nvidia_smi
 from fastapi.testclient import TestClient
 from starlette.responses import Response
 
+from gguf_loader.main import get_size
+
 APP_NAME= "gputopia"
-DEFAULT_COORDINATOR = "https://gputopia.ai/api/v1"
-DEFAULT_BASE_URL = "https://gputopia.ai/models"
+DEFAULT_COORDINATOR = "wss://gputopia.ai/api/v1"
 
 
 class Req(BaseModel):
@@ -31,8 +30,6 @@ class Config(BaseSettings):
     model_config = SettingsConfigDict(env_prefix=APP_NAME +'_worker', case_sensitive=False)
     auth_key: str = ""
     coordinator_url: str = DEFAULT_COORDINATOR
-    model_base_url: str = DEFAULT_BASE_URL
-    model_dir: str = os.path.expanduser('~/.ai-models')
 
 
 class WorkerMain:
@@ -53,13 +50,13 @@ class WorkerMain:
 
     async def guess_layers(self, model_path):
         # todo: read model file and compare to gpu resources
-        return 30
+        return 20
 
     async def load_model(self, name):
         if name == self.llama_model:
             return
         model_path = await self.get_model(name)
-        settings = LlamaSettings(model=model_path, n_gpu_layers=self.guess_layers(model_path), seed=-1, embedding=True, cache=True, port=8181)
+        settings = LlamaSettings(model=model_path, n_gpu_layers=await self.guess_layers(model_path), seed=-1, embedding=True, cache=True, port=8181)
         self.llama = create_llama_app(settings)
         self.llama_cli = TestClient(self.llama)
 
@@ -112,55 +109,25 @@ class WorkerMain:
                 ws.send(res.body.decode("urf-8"))
 
     async def get_model(self, name):
-        ret = self.get_local_model(name)
-        if ret:
-            return ret
         return await self.download_model(name)
 
-    def get_local_model(self, name):
-        dest = self.model_file_for(name)
-        if os.path.getsize(dest) > 0:
-            return dest
-        return None
-
-    def model_file_for(self, name):
-        return self.conf.model_dir + "/" + name.replace("/", ".")
-
     async def download_model(self, name):
-        url = self.conf.model_base_url + "/" + name.replace("/", ".")
-
-        async with httpx.AsyncClient() as client:
-            r = await client.head(url)
-            size = r.headers.get('Content-Length')
-            if not size:
-                params = self.get_model_params(name)
-                bits = self.get_model_bits(name)
-                # 70b * 4 bit = 35gb (roughly)
-                size = params * bits / 8
-
-            assert size, "unable to estimate model size, not downloading"
-
-            await self.free_up_space(size)
-
-            dest = self.model_file_for(name)
-
-            done = 0
-            with open(dest + ".tmp", "wb") as f:
-                async with client.stream("GET", url) as r:
-                    async for chunk in r.aiter_bytes():
-                        f.write(chunk)
-                        done += len(chunk)
-                        self.report_pct(name, done/size)
-            os.replace(dest + ".tmp", dest)
-            self.report_done(name)
-
-        return dest
+        # uses hf cache, so no need to handle here
+        from gguf_loader.main import download_gguf
+        size = get_size(name)
+        await self.free_up_space(size)
+        loop = asyncio.get_running_loop()
+        path = await loop.run_in_executor(None, lambda: download_gguf(name))
+        return path
 
     def report_done(self, name):
         print("\r", name, 100)
 
     def report_pct(self, name, pct):
         print("\r", name, pct, end='')
+
+    async def free_up_space(self, size):
+        pass
 
 
 def main():
@@ -181,7 +148,6 @@ def main():
 
     conf = Config(**{k: v for k, v in vars(args).items() if v is not None})
 
-
     wm = WorkerMain(conf)
 
-    asyncio.run(wm.main())
+    asyncio.run(wm.run())
