@@ -30,6 +30,7 @@ class Config(BaseSettings):
     model_config = SettingsConfigDict(env_prefix=APP_NAME +'_worker', case_sensitive=False)
     auth_key: str = ""
     coordinator_url: str = DEFAULT_COORDINATOR
+    ln_url: str = "DONT_PAY_ME"
 
 
 class WorkerMain:
@@ -60,14 +61,15 @@ class WorkerMain:
         self.llama = create_llama_app(settings)
         self.llama_cli = TestClient(self.llama)
 
-    @staticmethod
-    def connect_message() -> str:
+    def connect_message(self) -> str:
         ret = dict(
+            ln_url=self.conf.ln_url,
             cpu_count=multiprocessing.cpu_count(),
             vram=psutil.virtual_memory().available
         )
 
         try:
+            # get nvidia info...todo: amd support
             nv = nvidia_smi.getInstance()
             dq = nv.DeviceQuery()
             ret.update(dict(
