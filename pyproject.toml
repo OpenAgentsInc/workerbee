@@ -19,6 +19,8 @@ psutil = "^5.9.5"
 huggingface-hub = "^0.16.4"
 sentencepiece = "^0.1.99"
 python-dotenv = "^1.0.0"
+pynvml = "^11.5.0"
+gguf = "^0.3.2"
 
 
 [tool.poetry.group.dev.dependencies]
