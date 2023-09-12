@@ -6,9 +6,9 @@ from typing import Optional
 import logging as log
 
 import psutil
-import sseclient
 import websockets
 from httpx import Response
+from httpx_sse import aconnect_sse, connect_sse
 from llama_cpp.server.app import Settings as LlamaSettings, create_app as create_llama_app
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -109,15 +109,13 @@ class WorkerMain:
 
             await self.load_model(model)
 
-            res: Response = self.llama_cli.post(req.openai_url, json=req.openai_req)
-
-            if res.headers.get('Content-Type') == 'text/event-stream':
-                sse = sseclient.SSEClient(res)
-
-                for event in sse:
-                    await ws.send(event.data)
+            if req.openai_req.get("stream"):
+                with connect_sse(self.llama_cli, "POST", req.openai_url, json=req.openai_req) as sse:
+                    for event in sse.iter_sse():
+                        await ws.send(event.data)
                 await ws.send("")
             else:
+                res: Response = self.llama_cli.post(req.openai_url, json=req.openai_req)
                 await ws.send(res.text)
         except Exception as ex:
             await ws.send(json.dumps({"error": str(ex), "error_type": type(ex).__name__}))

@@ -12,7 +12,6 @@ python = ">=3.10,<3.13"
 llama-cpp-python = {extras = ["server"], version = "^0.1.83"}
 pydantic-settings = "^2.0.3"
 fastapi = "^0.103.1"
-sseclient = "^0.0.27"
 websockets = "^11.0.3"
 httpx = "^0.24.1"
 psutil = "^5.9.5"
@@ -23,6 +22,7 @@ pynvml = "^11.5.0"
 gguf = "^0.3.2"
 boto3 = "^1.28.45"
 itsdangerous = "^2.1.2"
+httpx-sse = "^0.3.1"
 
 
 [tool.poetry.group.dev.dependencies]

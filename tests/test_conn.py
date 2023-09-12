@@ -23,7 +23,7 @@ async def spider(websocket, _path):
             messages=[
                 {"role": "system", "content": "You are a helpful assistant"},
                 {"role": "user", "content": "hello"},
-            ]
+            ],
         )}
         await websocket.send(json.dumps(data))
 
