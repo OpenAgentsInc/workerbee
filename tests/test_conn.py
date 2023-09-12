@@ -1,5 +1,11 @@
+import asyncio
 import json
+import time
+from threading import Thread
+from typing import Any, Optional
 
+import pytest
+import websockets
 from ai_worker.main import WorkerMain, Config
 from gguf_loader.main import download_gguf, main as loader_main, get_size
 
@@ -9,8 +15,48 @@ except ImportError:
     nvidia_smi = None
 
 
+async def spider(websocket, _path):
+    model = "TheBloke/WizardLM-7B-uncensored-GGML:q4_K_M"
+    async for message in websocket:
+        data = {"openai_url": "/v1/chat/completions", "openai_req": dict(
+            model=model,
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant"},
+                {"role": "user", "content": "hello"},
+            ]
+        )}
+        await websocket.send(json.dumps(data))
+
+
+def start_server(ret):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    srv = websockets.serve(spider, "127.0.0.1", 0)
+    res = loop.run_until_complete(srv)
+    ret[0] = res
+    ret[1] = loop
+    loop.run_forever()
+
+
+@pytest.fixture(scope="module")
+def test_spider():
+    ret: list[Any] = [None, None]
+    thread = Thread(target=start_server, args=(ret,), daemon=True)
+    thread.daemon = True
+    thread.start()
+    while not ret[0]:
+        time.sleep(0.1)
+    server = ret[0]
+    port = server.sockets[0].getsockname()[1]
+    yield f"ws://127.0.0.1:{port}"
+    server.close()
+    # time to close
+    time.sleep(0.3)
+    ret[1].stop()
+
 def test_conn_str():
-    msg = WorkerMain.connect_message()
+    wm = WorkerMain(Config())
+    msg = wm.connect_message()
     js = json.loads(msg)
 
     if nvidia_smi:
@@ -32,6 +78,12 @@ async def test_wm():
         ]
     ))
     assert res
+
+
+async def test_run(test_spider):
+    wm = WorkerMain(Config(once=True, spider_url=test_spider))
+    await wm.run()
+
 
 def test_download_model():
     assert get_size("TheBloke/WizardLM-7B-uncensored-GGML:q4_K_M") > 0

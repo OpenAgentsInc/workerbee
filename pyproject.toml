@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ai-worker"
-version = "0.1.0"
+version = "0.1.1"
 description = "api server that posts capabilities, and accepts jobs"
 authors = ["erik aronesty <erik@q32.com>"]
 license = "MIT"
@@ -30,6 +30,7 @@ pytest = "^7.4.0"
 pytest-asyncio = "^0.21.1"
 pyinstaller = "^5.13.2"
 boto3 = "^1.28.43"
+ruff = "^0.0.288"
 
 
 [tool.poetry.scripts]

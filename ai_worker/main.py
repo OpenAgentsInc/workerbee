@@ -29,8 +29,9 @@ class Req(BaseModel):
 class Config(BaseSettings):
     model_config = SettingsConfigDict(env_prefix=APP_NAME +'_worker', case_sensitive=False)
     auth_key: str = ""
-    coordinator_url: str = DEFAULT_COORDINATOR
+    spider_url: str = DEFAULT_COORDINATOR
     ln_url: str = "DONT_PAY_ME"
+    once: bool = False
 
 
 class WorkerMain:
@@ -42,12 +43,15 @@ class WorkerMain:
         self.llama_cli: Optional[TestClient] = None
 
     async def run(self):
-        while True:
-            async for websocket in websockets.connect(self.conf.coordinator_url):
-                try:
-                    await self.run_ws(websocket)
-                except websockets.ConnectionClosed:
-                    continue
+        async for websocket in websockets.connect(self.conf.spider_url):
+            if self.stopped:
+                break
+            try:
+                await self.run_ws(websocket)
+            except websockets.ConnectionClosed:
+                continue
+            if self.stopped:
+                break
 
     async def guess_layers(self, model_path):
         # todo: read model file and compare to gpu resources
@@ -93,8 +97,14 @@ class WorkerMain:
         await ws.send(self.connect_message())
 
         while not self.stopped:
-            req_str = await ws.recv()
-            req = Req.from_json(req_str)
+            await self.run_one(ws)
+            if self.conf.once:
+                self.stopped = True
+
+    async def run_one(self, ws):
+        req_str = await ws.recv()
+        try:
+            req = Req.model_validate_json(req_str)
             model = req.openai_req.get("model")
 
             await self.load_model(model)
@@ -108,7 +118,9 @@ class WorkerMain:
                     ws.send(event.data)
                 ws.send("")
             else:
-                ws.send(res.body.decode("urf-8"))
+                ws.send(res.content.decode())
+        except Exception as ex:
+            ws.send(json.dumps({"error": str(ex), "error_type": type(ex).__name__}))
 
     async def get_model(self, name):
         return await self.download_model(name)
