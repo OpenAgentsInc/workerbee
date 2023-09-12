@@ -8,7 +8,7 @@ import logging as log
 import psutil
 import websockets
 from httpx import Response
-from httpx_sse import aconnect_sse, connect_sse
+from httpx_sse import connect_sse
 from llama_cpp.server.app import Settings as LlamaSettings, create_app as create_llama_app
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -93,15 +93,16 @@ class WorkerMain:
 
         return json.dumps(ret)
 
-    async def run_ws(self, ws):
+    async def run_ws(self, ws: websockets.WebSocketCommonProtocol):
         await ws.send(self.connect_message())
 
         while not self.stopped:
             await self.run_one(ws)
             if self.conf.once:
+                await asyncio.sleep(1)
                 self.stopped = True
 
-    async def run_one(self, ws):
+    async def run_one(self, ws: websockets.WebSocketCommonProtocol):
         req_str = await ws.recv()
         try:
             req = Req.model_validate_json(req_str)

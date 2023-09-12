@@ -14,18 +14,26 @@ try:
 except ImportError:
     nvidia_smi = None
 
+spider_events = []
+
 
 async def spider(websocket, _path):
     model = "TheBloke/WizardLM-7B-uncensored-GGML:q4_K_M"
+
     async for message in websocket:
-        data = {"openai_url": "/v1/chat/completions", "openai_req": dict(
-            model=model,
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant"},
-                {"role": "user", "content": "hello"},
-            ],
-        )}
-        await websocket.send(json.dumps(data))
+        spider_events.append(message)
+        if message:
+            jj = json.loads(message)
+            if jj.get("cpu_count"):
+                data = {"openai_url": "/v1/chat/completions", "openai_req": dict(
+                    model=model,
+                    stream=False,
+                    messages=[
+                        {"role": "system", "content": "You are a helpful assistant"},
+                        {"role": "user", "content": "hello"},
+                    ],
+                )}
+                await websocket.send(json.dumps(data))
 
 
 def start_server(ret):
@@ -54,6 +62,7 @@ def test_spider():
     time.sleep(0.3)
     ret[1].stop()
 
+
 def test_conn_str():
     wm = WorkerMain(Config())
     msg = wm.connect_message()
@@ -81,8 +90,12 @@ async def test_wm():
 
 
 async def test_run(test_spider):
+    spider_events.clear()
     wm = WorkerMain(Config(once=True, spider_url=test_spider))
     await wm.run()
+    while len(spider_events) == 1:
+        time.sleep(0.2)
+    assert len(spider_events) == 2
 
 
 def test_download_model():
