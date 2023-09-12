@@ -151,13 +151,15 @@ def main():
         description = field.description
         if field.default is not None and description is not None:
             description += f" (default: {field.default})"
-        parser.add_argument(
-            f"--{name}",
+        args = dict(
             dest=name,
             type=field.annotation if field.annotation is not None else str,
             help=description,
             action="store_true" if field.annotation is bool else "store",
         )
+        if field.annotation is bool:
+            args.pop("type")
+        parser.add_argument(f"--{name}", **args)
 
     args = parser.parse_args()
 
