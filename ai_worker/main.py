@@ -76,9 +76,10 @@ class WorkerMain:
             # get nvidia info...todo: amd support
             nv = nvidia_smi.getInstance()
             dq = nv.DeviceQuery()
+            # force throw error on version not there....
             ret.update(dict(
                 nv_gpu_count=dq.get("count"),
-                nv_driver_version=dq.get("driver_version"),
+                nv_driver_version=dq["driver_version"],
                 nv_gpus=[
                     dict(
                         name=g.get("product_name"),

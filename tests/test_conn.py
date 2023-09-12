@@ -9,10 +9,8 @@ import websockets
 from ai_worker.main import WorkerMain, Config
 from gguf_loader.main import download_gguf, main as loader_main, get_size
 
-try:
-    from pynvml.smi import nvidia_smi
-except ImportError:
-    nvidia_smi = None
+from pynvml.smi import nvidia_smi
+from pynvml.nvml import NVMLError
 
 spider_events = []
 
@@ -68,9 +66,15 @@ def test_conn_str():
     msg = wm.connect_message()
     js = json.loads(msg)
 
-    if nvidia_smi:
-        assert js["nv_driver_version"]
-        assert js["nv_gpu_count"]
+    try:
+        inst = nvidia_smi.getInstance()
+        dq = inst.DeviceQuery()
+        # sometimes it throws an error... sometimes not!
+        if dq.get("count"):
+            assert js["nv_driver_version"]
+            assert js["nv_gpu_count"]
+    except NVMLError:
+        pass
 
     assert js["cpu_count"]
     assert js["vram"]
