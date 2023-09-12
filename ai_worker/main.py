@@ -8,12 +8,12 @@ import logging as log
 import psutil
 import sseclient
 import websockets
+from httpx import Response
 from llama_cpp.server.app import Settings as LlamaSettings, create_app as create_llama_app
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pynvml.smi import nvidia_smi
 from fastapi.testclient import TestClient
-from starlette.responses import Response
 
 from gguf_loader.main import get_size
 
@@ -115,12 +115,12 @@ class WorkerMain:
                 sse = sseclient.SSEClient(res)
 
                 for event in sse:
-                    ws.send(event.data)
-                ws.send("")
+                    await ws.send(event.data)
+                await ws.send("")
             else:
-                ws.send(res.content.decode())
+                await ws.send(res.text)
         except Exception as ex:
-            ws.send(json.dumps({"error": str(ex), "error_type": type(ex).__name__}))
+            await ws.send(json.dumps({"error": str(ex), "error_type": type(ex).__name__}))
 
     async def get_model(self, name):
         return await self.download_model(name)
