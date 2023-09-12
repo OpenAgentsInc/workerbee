@@ -120,6 +120,7 @@ class WorkerMain:
                 res: Response = self.llama_cli.post(req.openai_url, json=req.openai_req)
                 await ws.send(res.text)
         except Exception as ex:
+            log.exception("error running request: %s", req_str)
             await ws.send(json.dumps({"error": str(ex), "error_type": type(ex).__name__}))
 
     async def get_model(self, name):
