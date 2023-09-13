@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import json
 import multiprocessing
+import time
 from typing import Optional
 import logging as log
 
@@ -31,6 +32,8 @@ class Config(BaseSettings):
     spider_url: str = DEFAULT_COORDINATOR
     ln_url: str = "DONT_PAY_ME"
     once: bool = False
+    test_model: str = ""
+    test_max_tokens: int = 200
 
 
 class WorkerMain:
@@ -41,7 +44,40 @@ class WorkerMain:
         self.llama_model = None
         self.llama_cli: Optional[AsyncClient] = None
 
+    async def test_model(self):
+        start = time.monotonic()
+        await self.load_model(self.conf.test_model)
+        load = time.monotonic() - start
+        openai_url = "/v1/chat/completions"
+
+        results = []
+        for genre in ("sci-fi", "romance", "political", "kids", "teen", "anime"):
+            start = time.monotonic()
+            openai_req = dict(
+                model=self.conf.test_model,
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": f"Write a short {genre} story."},
+                ],
+                max_tokens=self.conf.test_max_tokens
+            )
+            res: Response = await self.llama_cli.post(openai_url, json=openai_req)
+            results.append((res.text, time.monotonic()-start))
+
+        print("Load time:", load)
+        sumt = 0.0
+        for ent in results:
+            usage = json.loads(ent[0])["usage"]
+            secs = ent[1]
+            sumt += secs
+            print("Usage:", usage, secs)
+        print("Average:", sumt/len(results))
+
     async def run(self):
+        if self.conf.test_model:
+            await self.test_model()
+            return
+
         async for websocket in websockets.connect(self.conf.spider_url):
             if self.stopped:
                 break
