@@ -25,7 +25,7 @@ async def spider(websocket, _path):
             if jj.get("cpu_count"):
                 data = {"openai_url": "/v1/chat/completions", "openai_req": dict(
                     model=model,
-                    stream=True,
+                    stream=False,
                     messages=[
                         {"role": "system", "content": "You are a helpful assistant"},
                         {"role": "user", "content": "hello"},
