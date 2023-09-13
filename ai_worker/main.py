@@ -34,6 +34,8 @@ class Config(BaseSettings):
     once: bool = False
     test_model: str = ""
     test_max_tokens: int = 200
+    low_vram: bool = False
+    force_layers: int = 0
 
 
 class WorkerMain:
@@ -90,13 +92,13 @@ class WorkerMain:
 
     async def guess_layers(self, model_path):
         # todo: read model file and compare to gpu resources
-        return 20
+        return self.conf.force_layers || 20
 
     async def load_model(self, name):
         if name == self.llama_model:
             return
         model_path = await self.get_model(name)
-        settings = LlamaSettings(model=model_path, n_gpu_layers=await self.guess_layers(model_path), seed=-1, embedding=True, cache=True, port=8181)
+        settings = LlamaSettings(model=model_path, n_gpu_layers=await self.guess_layers(model_path), seed=-1, embedding=True, cache=True, low_vram=self.conf.low_vram, port=8181)
         self.llama = create_llama_app(settings)
         self.llama_cli = AsyncClient(app=self.llama, base_url="http://test")
 
