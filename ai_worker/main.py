@@ -7,13 +7,12 @@ import logging as log
 
 import psutil
 import websockets
-from httpx import Response
-from httpx_sse import connect_sse
+from httpx import Response, AsyncClient
+from httpx_sse import aconnect_sse
 from llama_cpp.server.app import Settings as LlamaSettings, create_app as create_llama_app
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pynvml.smi import nvidia_smi
-from fastapi.testclient import TestClient
 
 from gguf_loader.main import get_size
 
@@ -40,7 +39,7 @@ class WorkerMain:
         self.stopped = False
         self.llama = None
         self.llama_model = None
-        self.llama_cli: Optional[TestClient] = None
+        self.llama_cli: Optional[AsyncClient] = None
 
     async def run(self):
         async for websocket in websockets.connect(self.conf.spider_url):
@@ -63,7 +62,7 @@ class WorkerMain:
         model_path = await self.get_model(name)
         settings = LlamaSettings(model=model_path, n_gpu_layers=await self.guess_layers(model_path), seed=-1, embedding=True, cache=True, port=8181)
         self.llama = create_llama_app(settings)
-        self.llama_cli = TestClient(self.llama)
+        self.llama_cli = AsyncClient(app=self.llama, base_url="http://test")
 
     def connect_message(self) -> str:
         ret = dict(
@@ -112,12 +111,12 @@ class WorkerMain:
             await self.load_model(model)
 
             if req.openai_req.get("stream"):
-                with connect_sse(self.llama_cli, "POST", req.openai_url, json=req.openai_req) as sse:
-                    for event in sse.iter_sse():
+                async with aconnect_sse(self.llama_cli, "POST", req.openai_url, json=req.openai_req) as sse:
+                    async for event in sse.aiter_sse():
                         await ws.send(event.data)
                 await ws.send("")
             else:
-                res: Response = self.llama_cli.post(req.openai_url, json=req.openai_req)
+                res: Response = await self.llama_cli.post(req.openai_url, json=req.openai_req)
                 await ws.send(res.text)
         except Exception as ex:
             log.exception("error running request: %s", req_str)

@@ -25,7 +25,7 @@ async def spider(websocket, _path):
             if jj.get("cpu_count"):
                 data = {"openai_url": "/v1/chat/completions", "openai_req": dict(
                     model=model,
-                    stream=False,
+                    stream=True,
                     messages=[
                         {"role": "system", "content": "You are a helpful assistant"},
                         {"role": "user", "content": "hello"},
@@ -100,6 +100,8 @@ async def test_run(test_spider):
     while len(spider_events) == 1:
         time.sleep(0.2)
     assert len(spider_events) == 2
+    js = json.loads(spider_events[1])
+    assert not js.get("error")
 
 
 def test_download_model():
