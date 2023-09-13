@@ -92,7 +92,7 @@ class WorkerMain:
 
     async def guess_layers(self, model_path):
         # todo: read model file and compare to gpu resources
-        return self.conf.force_layers || 20
+        return self.conf.force_layers or 20
 
     async def load_model(self, name):
         if name == self.llama_model:
