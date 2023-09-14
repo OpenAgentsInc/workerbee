@@ -65,10 +65,17 @@ def pick_file(name):
 
 def download_gguf(name):
     typ, repo_id, fil = pick_file(name)
+
+    # todo: manage this way better
+    #       remove old
+    #       don't rely on cache, use our own
+    #       remove ggml/tmp/etc
+    #       add conversions for pth
+
     if typ == "ggml":
         base = os.path.basename(fil["name"])
         log.debug("downloading...")
-        # use hf so we get a nice cache
+        # use hf so we get a free cache
         path = hf_hub_download(repo_id=repo_id, filename=base, resume_download=True)
         return convert_to_gguf(path)
 
