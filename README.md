@@ -8,17 +8,18 @@ when building, do this:
 
 ### for osx/metal:
 
-`CMAKE_ARGS="-DLLAMA_CUBLAS=1" FORCE_CMAKE=1 poetry install`
+`CMAKE_ARGS="-DLLAMA_METAL=1" FORCE_CMAKE=1 poetry install`
 
 if you want it to see the gpus!
 
 ### for CLBLAST
 
-get this: 
+get (or build) this: 
 
 https://github.com/KhronosGroup/OpenCL-SDK/releases
 
-put it in c:/opencl-sdk
+
+put it in c:/opencl-sdk or (on linux) cmake --install it
 
 ```
 git clone https://github.com/CNugteren/CLBlast.git
