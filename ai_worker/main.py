@@ -25,7 +25,7 @@ from gguf_loader.main import get_size
 from .gguf_reader import GGUFReader
 
 APP_NAME = "gputopia"
-DEFAULT_COORDINATOR = "wss://gputopia.ai/api/v1"
+DEFAULT_COORDINATOR = "wss://queenbee.gputopia.ai/worker"
 
 log = logging.getLogger(__name__)
 
@@ -239,6 +239,8 @@ class WorkerMain:
             req = Req.model_validate_json(req_str)
             model = req.openai_req.get("model")
 
+            log.debug("loading %s", model)
+
             await self.load_model(model)
 
             if req.openai_req.get("stream"):
@@ -249,6 +251,8 @@ class WorkerMain:
             else:
                 res: Response = await self.llama_cli.post(req.openai_url, json=req.openai_req)
                 await ws.send(res.text)
+            
+            log.debug("done %s", model)
         except Exception as ex:
             log.exception("error running request: %s", req_str)
             await ws.send(json.dumps({"error": str(ex), "error_type": type(ex).__name__}))
