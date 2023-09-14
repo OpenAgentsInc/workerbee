@@ -12,5 +12,5 @@ if os.name == 'nt':  # Windows
     dll_path = os.path.join(package_path, 'llama_cpp', 'llama.dll')
     datas.append((dll_path, 'llama_cpp'))
 elif os.name == 'posix':  # Linux/Mac
-    so_path = os.path.join(package_path, 'llama_cpp', 'llama.so')
+    so_path = os.path.join(package_path, 'llama_cpp', 'libllama.so')
     datas.append((so_path, 'llama_cpp'))
