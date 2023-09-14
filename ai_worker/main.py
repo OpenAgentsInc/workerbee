@@ -4,6 +4,7 @@ import json
 import logging
 import multiprocessing
 import time
+from pprint import pprint
 from typing import Optional, List
 
 import psutil
@@ -14,6 +15,7 @@ from llama_cpp.server.app import Settings as LlamaSettings, create_app as create
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pynvml.smi import nvidia_smi
+import pyopencl
 
 from gguf_loader.main import get_size
 
@@ -29,10 +31,12 @@ class Req(BaseModel):
     openai_req: dict
 
 
-class NvidiaGpuInfo(BaseModel):
+class GpuInfo(BaseModel):
     name: Optional[str]
-    uuid: Optional[str]
+    uuid: Optional[str] = None
     memory: Optional[float]
+    clock: Optional[int]
+    clock_unit: Optional[str]
 
 
 class ConnectMessage(BaseModel):
@@ -41,8 +45,9 @@ class ConnectMessage(BaseModel):
     vram: int
     nv_gpu_count: Optional[int] = None
     nv_driver_version: Optional[str] = None
-    nv_gpus: Optional[List[NvidiaGpuInfo]] = []
-
+    nv_gpus: Optional[List[GpuInfo]] = []
+    cl_driver_version: Optional[str] = None
+    cl_gpus: Optional[List[GpuInfo]] = []
 
 class Config(BaseSettings):
     model_config = SettingsConfigDict(env_prefix=APP_NAME + '_worker', case_sensitive=False)
@@ -67,6 +72,7 @@ class WorkerMain:
         self.llama_cli: Optional[AsyncClient] = None
 
     async def test_model(self):
+        pprint(self.connect_info().model_dump())
         start = time.monotonic()
         await self.load_model(self.conf.test_model)
         load = time.monotonic() - start
@@ -158,15 +164,33 @@ class WorkerMain:
             connect_msg.nv_gpu_count = dq.get("count")
             connect_msg.nv_driver_version = dq["driver_version"]
             connect_msg.nv_gpus = [
-                NvidiaGpuInfo(
+                GpuInfo(
                     name=g.get("product_name"),
                     uuid=g.get("uuid"),
-                    memory=g.get("fb_memory_usage", {}).get("total")
-                ) for g in dq.get("gpu", [])
+                    memory=g.get("fb_memory_usage", {}).get("total"),
+                    clock=g.get("clocks", {}).get("graphics_clock"),
+                    clock_unit=g.get("clocks", {}).get("unit"),
+            ) for g in dq.get("gpu", [])
             ]
 
         except Exception as ex:
             log.debug("no nvidia: %s", ex)
+
+        try:
+            for platform in pyopencl.get_platforms():
+                if "nvidia" in platform.name.lower():
+                    continue
+                connect_msg.cl_driver_version = platform.version
+                for device in platform.get_devices():
+                    inf = GpuInfo(
+                            name=device.name,
+                            memory=int(device.global_mem_size/1000000),
+                            clock=device.max_clock_frequency,
+                            clock_unit="mhz"
+                        )
+                    connect_msg.cl_gpus.append(inf)
+        except Exception as ex:
+            log.debug("no opencl: %s", ex)
 
         return connect_msg
 
