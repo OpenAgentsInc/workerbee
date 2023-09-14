@@ -1,8 +1,11 @@
 import argparse
 import asyncio
+import ctypes
 import json
 import logging
 import multiprocessing
+import os
+import platform
 import time
 from pprint import pprint
 from typing import Optional, List
@@ -26,6 +29,7 @@ DEFAULT_COORDINATOR = "wss://gputopia.ai/api/v1"
 
 log = logging.getLogger(__name__)
 
+
 class Req(BaseModel):
     openai_url: str
     openai_req: dict
@@ -42,12 +46,14 @@ class GpuInfo(BaseModel):
 class ConnectMessage(BaseModel):
     ln_url: str
     cpu_count: int
+    disk_space: int
     vram: int
     nv_gpu_count: Optional[int] = None
     nv_driver_version: Optional[str] = None
     nv_gpus: Optional[List[GpuInfo]] = []
     cl_driver_version: Optional[str] = None
     cl_gpus: Optional[List[GpuInfo]] = []
+
 
 class Config(BaseSettings):
     model_config = SettingsConfigDict(env_prefix=APP_NAME + '_worker', case_sensitive=False)
@@ -60,6 +66,17 @@ class Config(BaseSettings):
     test_max_tokens: int = 16
     low_vram: bool = False
     force_layers: int = 0
+
+
+def get_free_space_mb(dirname):
+    """Return folder/drive free space (in megabytes)."""
+    if platform.system() == 'Windows':
+        free_bytes = ctypes.c_ulonglong(0)
+        ctypes.windll.kernel32.GetDiskFreeSpaceExW(ctypes.c_wchar_p(dirname), None, None, ctypes.pointer(free_bytes))
+        return free_bytes.value / 1024 / 1024
+    else:
+        st = os.statvfs(dirname)
+        return st.f_bavail * st.f_frsize / 1024 / 1024
 
 
 class WorkerMain:
@@ -133,7 +150,7 @@ class WorkerMain:
             tot_mem += gpu.memory * 1000000
 
         if est_ram > tot_mem:
-            est_layers = tot_mem // (est_ram/layers)
+            est_layers = tot_mem // (est_ram / layers)
         else:
             est_layers = layers
 
@@ -151,8 +168,12 @@ class WorkerMain:
         self.llama_cli = AsyncClient(app=self.llama, base_url="http://test")
 
     def _get_connect_info(self) -> ConnectMessage:
+        disk_space = get_free_space_mb(".")
+
         connect_msg = ConnectMessage(
             ln_url=self.conf.ln_url,
+            auth_key=self.conf.auth_key,
+            disk_space=int(disk_space),
             cpu_count=multiprocessing.cpu_count(),
             vram=psutil.virtual_memory().available,
         )
@@ -170,7 +191,7 @@ class WorkerMain:
                     memory=g.get("fb_memory_usage", {}).get("total"),
                     clock=g.get("clocks", {}).get("graphics_clock"),
                     clock_unit=g.get("clocks", {}).get("unit"),
-            ) for g in dq.get("gpu", [])
+                ) for g in dq.get("gpu", [])
             ]
 
         except Exception as ex:
@@ -183,11 +204,11 @@ class WorkerMain:
                 connect_msg.cl_driver_version = platform.version
                 for device in platform.get_devices():
                     inf = GpuInfo(
-                            name=device.name,
-                            memory=int(device.global_mem_size/1000000),
-                            clock=device.max_clock_frequency,
-                            clock_unit="mhz"
-                        )
+                        name=device.name,
+                        memory=int(device.global_mem_size / 1000000),
+                        clock=device.max_clock_frequency,
+                        clock_unit="mhz"
+                    )
                     connect_msg.cl_gpus.append(inf)
         except Exception as ex:
             log.debug("no opencl: %s", ex)
