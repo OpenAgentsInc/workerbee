@@ -1,3 +1,3 @@
 #!/bin/bash
 
-aws s3 cp dist/gputopia-worker-* s3://gputopia/bin/gputopia-worker-cuda-linux-64 --acl public-read
+aws s3 cp dist/gputopia-worker-* s3://gputopia/bin/ --acl public-read
