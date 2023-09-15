@@ -14,7 +14,8 @@ import psutil
 import websockets
 from httpx import Response, AsyncClient
 from httpx_sse import aconnect_sse
-from llama_cpp.server.app import Settings as LlamaSettings, create_app as create_llama_app
+from llama_cpp.server.app import Settings as LlamaSettings, create_app as create_llama_app, llama as global_llama
+from llama_cpp import llama_free_model
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pynvml.smi import nvidia_smi
@@ -130,6 +131,8 @@ class WorkerMain:
                 await self.run_ws(websocket)
             except websockets.ConnectionClosed:
                 continue
+            except Exception:
+                log.exception("error in worker")
             if self.stopped:
                 break
 
@@ -161,11 +164,20 @@ class WorkerMain:
     async def load_model(self, name):
         if name == self.llama_model:
             return
+        log.debug("loading model: %s", name)
         model_path = await self.get_model(name)
+
+        if global_llama:
+            llama_free_model(global_llama.model)
+            llama_free_model(global_llama.ctx)
+            global_llama.model = None
+            global_llama.ctx = None
+
         settings = LlamaSettings(model=model_path, n_gpu_layers=await self.guess_layers(model_path), seed=-1,
                                  embedding=True, cache=True, low_vram=self.conf.low_vram, port=8181)
         self.llama = create_llama_app(settings)
         self.llama_cli = AsyncClient(app=self.llama, base_url="http://test")
+        self.llama_model = name
 
     def _get_connect_info(self) -> ConnectMessage:
         disk_space = get_free_space_mb(".")
