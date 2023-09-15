@@ -16,7 +16,6 @@ from httpx import Response, AsyncClient
 from httpx_sse import aconnect_sse
 from llama_cpp.server.app import Settings as LlamaSettings, create_app as create_llama_app
 import llama_cpp.server.app
-from llama_cpp import llama_free_model, llama_free
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pynvml.smi import nvidia_smi
