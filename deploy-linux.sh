@@ -25,4 +25,4 @@ CMAKE_ARGS="-DLLAMA_CLBLAST=ON" FORCE_CMAKE=1 poetry install
 
 deactivate
 
-#./upload.sh
+./upload.sh
