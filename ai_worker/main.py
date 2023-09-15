@@ -6,6 +6,7 @@ import logging
 import multiprocessing
 import os
 import platform
+import sys
 import time
 from pprint import pprint
 from typing import Optional, List
@@ -237,7 +238,9 @@ class WorkerMain:
         return info.model_dump_json()
 
     async def run_ws(self, ws: websockets.WebSocketCommonProtocol):
-        await ws.send(self.connect_message())
+        msg = self.connect_message()
+        log.info("connect spider: %s", msg)
+        await ws.send(msg)
 
         while not self.stopped:
             await self.run_one(ws)
@@ -255,6 +258,7 @@ class WorkerMain:
 
             await self.load_model(model)
 
+            st = time.monotonic()
             if req.openai_req.get("stream"):
                 async with aconnect_sse(self.llama_cli, "POST", req.openai_url, json=req.openai_req) as sse:
                     async for event in sse.aiter_sse():
@@ -263,8 +267,8 @@ class WorkerMain:
             else:
                 res: Response = await self.llama_cli.post(req.openai_url, json=req.openai_req)
                 await ws.send(res.text)
-            
-            log.debug("done %s", model)
+            en = time.monotonic()
+            log.info("done %s (%s secs)", model, en-st)
         except Exception as ex:
             log.exception("error running request: %s", req_str)
             await ws.send(json.dumps({"error": str(ex), "error_type": type(ex).__name__}))
@@ -292,8 +296,9 @@ class WorkerMain:
 
 
 def main():
-    logging.basicConfig()
-    log.setLevel(logging.INFO)
+    logging.basicConfig(level=logging.INFO, 
+                        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                        stream=sys.stdout)
     parser = argparse.ArgumentParser()
     for name, field in Config.model_fields.items():
         description = field.description
@@ -312,6 +317,9 @@ def main():
     args = parser.parse_args()
     if args.debug:
         log.setLevel(logging.DEBUG)
+
+    if os.path.exists("gputopia-worker.ini"):
+        logging.config.fileConfig("gputopia-worker.ini")
 
     conf = Config(**{k: v for k, v in vars(args).items() if v is not None})
 
