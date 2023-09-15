@@ -1,0 +1,3 @@
+hiddenimports = [
+    "websockets",
+]
