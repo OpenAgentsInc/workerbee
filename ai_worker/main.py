@@ -47,6 +47,7 @@ class GpuInfo(BaseModel):
 
 class ConnectMessage(BaseModel):
     ln_url: str
+    auth_key: str
     cpu_count: int
     disk_space: int
     vram: int
