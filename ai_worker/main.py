@@ -56,6 +56,7 @@ class ConnectMessage(BaseModel):
     nv_gpus: Optional[List[GpuInfo]] = []
     cl_driver_version: Optional[str] = None
     cl_gpus: Optional[List[GpuInfo]] = []
+    web_gpus: Optional[List[GpuInfo]] = []
 
 
 class Config(BaseSettings):
