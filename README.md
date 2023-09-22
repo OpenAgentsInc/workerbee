@@ -34,8 +34,8 @@ cmake --install . --prefix C:/CLBlast
 
 
 ### run worker
-`poetry shell`
-`poetry run gputopia_worker`
+- `poetry shell`
+- `poetry run gputopia_worker`
 
 
 ### run tests
