@@ -14,7 +14,7 @@ if you want it to see the gpus!
 
 ### for CLBLAST
 
-get (or build) this: 
+get (or build) this:
 
 https://github.com/KhronosGroup/OpenCL-SDK/releases
 
@@ -31,6 +31,12 @@ cmake --install . --prefix C:/CLBlast
 ```
 
 `CMAKE_ARGS="-DLLAMA_CLBLAST=ON -DCMAKE_PREFIX_PATH=C:/CLBlast/lib/cmake/CLBlast" FORCE_CMAKE=1 poetry install`
+
+
+### run worker
+`poetry shell`
+`poetry run gputopia_worker`
+
 
 ### run tests
 
