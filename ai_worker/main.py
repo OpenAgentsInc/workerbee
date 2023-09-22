@@ -60,9 +60,10 @@ class ConnectMessage(BaseModel):
 
 
 class Config(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix=APP_NAME + '_worker', case_sensitive=False)
+    model_config = SettingsConfigDict(
+        env_prefix=APP_NAME + '_worker', case_sensitive=False)
     auth_key: str = ""
-    spider_url: str = DEFAULT_COORDINATOR
+    queen_url: str = DEFAULT_COORDINATOR
     ln_url: str = "DONT_PAY_ME"
     once: bool = False
     debug: bool = False
@@ -76,7 +77,8 @@ def get_free_space_mb(dirname):
     """Return folder/drive free space (in megabytes)."""
     if platform.system() == 'Windows':
         free_bytes = ctypes.c_ulonglong(0)
-        ctypes.windll.kernel32.GetDiskFreeSpaceExW(ctypes.c_wchar_p(dirname), None, None, ctypes.pointer(free_bytes))
+        ctypes.windll.kernel32.GetDiskFreeSpaceExW(
+            ctypes.c_wchar_p(dirname), None, None, ctypes.pointer(free_bytes))
         return free_bytes.value / 1024 / 1024
     else:
         st = os.statvfs(dirname)
@@ -127,7 +129,7 @@ class WorkerMain:
             await self.test_model()
             return
 
-        async for websocket in websockets.connect(self.conf.spider_url):
+        async for websocket in websockets.connect(self.conf.queen_url):
             if self.stopped:
                 break
             try:
@@ -160,7 +162,8 @@ class WorkerMain:
         else:
             est_layers = layers
 
-        log.info("guessing layers: %s (tm %s el %s er %s)", est_layers, tot_mem, est_layers, est_ram)
+        log.info("guessing layers: %s (tm %s el %s er %s)",
+                 est_layers, tot_mem, est_layers, est_ram)
 
         return est_layers
 
@@ -239,7 +242,7 @@ class WorkerMain:
 
     async def run_ws(self, ws: websockets.WebSocketCommonProtocol):
         msg = self.connect_message()
-        log.info("connect spider: %s", msg)
+        log.info("connect queen: %s", msg)
         await ws.send(msg)
 
         while not self.stopped:
@@ -296,7 +299,7 @@ class WorkerMain:
 
 
 def main():
-    logging.basicConfig(level=logging.INFO, 
+    logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                         stream=sys.stdout)
     parser = argparse.ArgumentParser()

@@ -12,14 +12,14 @@ from gguf_loader.main import download_gguf, main as loader_main, get_size
 from pynvml.smi import nvidia_smi
 from pynvml.nvml import NVMLError
 
-spider_events = []
+queen_events = []
 
 
-async def spider(websocket, _path):
+async def queen(websocket, _path):
     model = "TheBloke/WizardLM-7B-uncensored-GGML:q4_K_M"
 
     async for message in websocket:
-        spider_events.append(message)
+        queen_events.append(message)
         if message:
             jj = json.loads(message)
             if jj.get("cpu_count"):
@@ -37,7 +37,7 @@ async def spider(websocket, _path):
 def start_server(ret):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    srv = websockets.serve(spider, "127.0.0.1", 0)
+    srv = websockets.serve(queen, "127.0.0.1", 0)
     res = loop.run_until_complete(srv)
     ret[0] = res
     ret[1] = loop
@@ -45,7 +45,7 @@ def start_server(ret):
 
 
 @pytest.fixture(scope="module")
-def test_spider():
+def test_queen():
     ret: list[Any] = [None, None]
     thread = Thread(target=start_server, args=(ret,), daemon=True)
     thread.daemon = True
@@ -93,14 +93,14 @@ async def test_wm():
     assert res
 
 
-async def test_run(test_spider):
-    spider_events.clear()
-    wm = WorkerMain(Config(once=True, spider_url=test_spider))
+async def test_run(test_queen):
+    queen_events.clear()
+    wm = WorkerMain(Config(once=True, queen_url=test_queen))
     await wm.run()
-    while len(spider_events) == 1:
+    while len(queen_events) == 1:
         time.sleep(0.2)
-    assert len(spider_events) == 2
-    js = json.loads(spider_events[1])
+    assert len(queen_events) == 2
+    js = json.loads(queen_events[1])
     assert not js.get("error")
 
 
