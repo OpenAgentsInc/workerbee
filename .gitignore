@@ -2,6 +2,8 @@
 CLBlast/
 build-cuda/
 build-opencl/
+bin/
+*.gguf
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
