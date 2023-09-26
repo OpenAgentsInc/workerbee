@@ -108,7 +108,7 @@ class WorkerMain:
                 model=self.conf.test_model,
                 messages=[
                     {"role": "system", "content": "You are a helpful assistant."},
-                    {"role": "user", "content": f"Write a short {genre} story."},
+                    {"role": "user", "content": f"In the style of Edgar Allen Poe, please write a short {genre} story that is no more than 3 sentences."},
                 ],
                 max_tokens=self.conf.test_max_tokens
             )
@@ -165,7 +165,7 @@ class WorkerMain:
         log.info("guessing layers: %s (tm %s el %s er %s)",
                  est_layers, tot_mem, est_layers, est_ram)
 
-        return est_layers
+        return est_layers - 2
 
     async def load_model(self, name):
         if name == self.llama_model:
