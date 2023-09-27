@@ -165,7 +165,7 @@ class WorkerMain:
         log.info("guessing layers: %s (tm %s el %s er %s)",
                  est_layers, tot_mem, est_layers, est_ram)
 
-        return est_layers - 2
+        return min(0, est_layers - 2)
 
     async def load_model(self, name):
         if name == self.llama_model:
