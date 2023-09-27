@@ -265,8 +265,9 @@ class WorkerMain:
             if req.openai_req.get("stream"):
                 async with aconnect_sse(self.llama_cli, "POST", req.openai_url, json=req.openai_req) as sse:
                     async for event in sse.aiter_sse():
-                        await ws.send(event.data)
-                await ws.send("")
+                        if event.data != "[DONE]":
+                            await ws.send(event.data)
+                await ws.send("{}")
             else:
                 res: Response = await self.llama_cli.post(req.openai_url, json=req.openai_req)
                 await ws.send(res.text)
