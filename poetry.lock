@@ -455,12 +455,12 @@ files = [
 
 [[package]]
 name = "llama-cpp-python"
-version = "0.2.2"
+version = "0.2.7"
 description = "Python bindings for the llama.cpp library"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "llama_cpp_python-0.2.2.tar.gz", hash = "sha256:b8646919839730241109be9b2016577d5df85466d72f6db0690bc9529cf8e446"},
+    {file = "llama_cpp_python-0.2.7.tar.gz", hash = "sha256:2267d3e90bf461ee581dc78332007ea15d9b40e79471850455458b399e3f1887"},
 ]
 
 [package.dependencies]
@@ -469,13 +469,14 @@ fastapi = {version = ">=0.100.0", optional = true, markers = "extra == \"server\
 numpy = ">=1.20.0"
 pydantic-settings = {version = ">=2.0.1", optional = true, markers = "extra == \"server\""}
 sse-starlette = {version = ">=1.6.1", optional = true, markers = "extra == \"server\""}
+starlette-context = {version = ">=0.3.6,<0.4", optional = true, markers = "extra == \"server\""}
 typing-extensions = ">=4.5.0"
 uvicorn = {version = ">=0.22.0", optional = true, markers = "extra == \"server\""}
 
 [package.extras]
 all = ["llama_cpp_python[dev,server,test]"]
 dev = ["black (>=23.3.0)", "httpx (>=0.24.1)", "mkdocs (>=1.4.3)", "mkdocs-material (>=9.1.18)", "mkdocstrings[python] (>=0.22.0)", "pytest (>=7.4.0)", "twine (>=4.0.2)"]
-server = ["fastapi (>=0.100.0)", "pydantic-settings (>=2.0.1)", "sse-starlette (>=1.6.1)", "uvicorn (>=0.22.0)"]
+server = ["fastapi (>=0.100.0)", "pydantic-settings (>=2.0.1)", "sse-starlette (>=1.6.1)", "starlette-context (>=0.3.6,<0.4)", "uvicorn (>=0.22.0)"]
 test = ["httpx (>=0.24.1)", "pytest (>=7.4.0)"]
 
 [[package]]
@@ -1193,6 +1194,20 @@ anyio = ">=3.4.0,<5"
 
 [package.extras]
 full = ["httpx (>=0.22.0)", "itsdangerous", "jinja2", "python-multipart", "pyyaml"]
+
+[[package]]
+name = "starlette-context"
+version = "0.3.6"
+description = "Middleware for Starlette that allows you to store and access the context data of a request. Can be used with logging so logs automatically use request headers such as x-request-id or x-correlation-id."
+optional = false
+python-versions = ">=3.8,<4.0"
+files = [
+    {file = "starlette_context-0.3.6-py3-none-any.whl", hash = "sha256:b14ce373fbb6895a2182a7104b9f63ba20c8db83444005fb9a844dd77ad9895c"},
+    {file = "starlette_context-0.3.6.tar.gz", hash = "sha256:d361a36ba2d4acca3ab680f917b25e281533d725374752d47607a859041958cb"},
+]
+
+[package.dependencies]
+starlette = "*"
 
 [[package]]
 name = "tomli"
