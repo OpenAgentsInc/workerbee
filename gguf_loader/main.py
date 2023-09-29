@@ -53,7 +53,7 @@ def pick_file(name):
     gguf = [f for f in lst if "gguf" in f["name"]]
 
     if not gguf:
-        print(lst)
+        log.info("no %s gguf, searching for ggml", name)
         ggml = [f for f in lst if "ggml" in f["name"]]
         try_conv = [f for f in lst if f["name"].endswith("/config.json")]
 
