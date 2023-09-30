@@ -25,7 +25,9 @@ def convert_to_gguf(file):
     dest = file + ".gguf"
     if os.path.exists(dest) and os.path.getsize(dest):
         return dest
-    sys.argv = ["convert-to-gguf", "-i", file, "-o", dest + ".tmp"]
+    sys.argv = ["convert-to-gguf", "-i", file, "-o", dest + ".tmp", "--eps", "1e-5"]
+    if "70b" in dest.lower():
+        sys.argv += ["--gqa", "8"]
     convert_to_gguf_main()
     os.replace(dest + ".tmp", dest)
     return dest
