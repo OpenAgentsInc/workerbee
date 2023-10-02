@@ -3,6 +3,7 @@ import asyncio
 import ctypes
 import json
 import logging
+import logging.config
 import multiprocessing
 import os
 import platform
@@ -108,7 +109,7 @@ class WorkerMain:
                 model=self.conf.test_model,
                 messages=[
                     {"role": "system", "content": "You are a helpful assistant."},
-                    {"role": "user", "content": f"Write a short {genre} story."},
+                    {"role": "user", "content": f"In the style of Edgar Allen Poe, please write a short {genre} story that is no more than 3 sentences."},
                 ],
                 max_tokens=self.conf.test_max_tokens
             )
@@ -165,7 +166,7 @@ class WorkerMain:
         log.info("guessing layers: %s (tm %s el %s er %s)",
                  est_layers, tot_mem, est_layers, est_ram)
 
-        return est_layers
+        return min(0, est_layers - 2)
 
     async def load_model(self, name):
         if name == self.llama_model:
@@ -265,8 +266,9 @@ class WorkerMain:
             if req.openai_req.get("stream"):
                 async with aconnect_sse(self.llama_cli, "POST", req.openai_url, json=req.openai_req) as sse:
                     async for event in sse.aiter_sse():
-                        await ws.send(event.data)
-                await ws.send("")
+                        if event.data != "[DONE]":
+                            await ws.send(event.data)
+                await ws.send("{}")
             else:
                 res: Response = await self.llama_cli.post(req.openai_url, json=req.openai_req)
                 await ws.send(res.text)
