@@ -1,4 +1,7 @@
-# How to use the worker:
+# GPUtopia Workerbee
+
+
+## How to use the worker:
 
 - first set up an account at gputopia.ai, this is the easiest way to ensure your funds are swept correctly.
 - for now, we only support alby logins.   i know this isn't ideal.   but it's easier for now.  in the future, any ln-wallet should work to log in and claim control over a given lnurl.
@@ -7,7 +10,7 @@
 - if that works, run `gputopia-worker --ln_url your-ln-url-goes-here`
 
 
-# How to build the worker from source:
+## How to build the worker from source:
 
 When building, please ensure you have CUDA installd or OPENCL (for AMD chips).   You can also do a METAL build for OSX.
 
@@ -53,4 +56,3 @@ cmake --install . --prefix C:/CLBlast
 ### Build your own EXE
 
 `pyinstaller --onefile --name gputopia-worker --additional-hooks-dir=./hooks ai_worker/__main__.py`
-
