@@ -26,6 +26,7 @@ import pyopencl
 from gguf_loader.main import get_size
 
 from .gguf_reader import GGUFReader
+from .version import VERSION
 
 APP_NAME = "gputopia"
 DEFAULT_COORDINATOR = "wss://queenbee.gputopia.ai/worker"
@@ -47,6 +48,7 @@ class GpuInfo(BaseModel):
 
 
 class ConnectMessage(BaseModel):
+    worker_version: str
     ln_url: str
     auth_key: str
     cpu_count: int
@@ -189,6 +191,7 @@ class WorkerMain:
         disk_space = get_free_space_mb(".")
 
         connect_msg = ConnectMessage(
+            worker_version=VERSION,
             ln_url=self.conf.ln_url,
             auth_key=self.conf.auth_key,
             disk_space=int(disk_space),
@@ -301,11 +304,12 @@ class WorkerMain:
         pass
 
 
-def main():
+def main(argv=None):
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                         stream=sys.stdout)
     parser = argparse.ArgumentParser()
+    arg_names = []
     for name, field in Config.model_fields.items():
         description = field.description
         if field.default is not None and description is not None:
@@ -318,16 +322,23 @@ def main():
         )
         if field.annotation is bool:
             args.pop("type")
+        arg_names.append(name)
         parser.add_argument(f"--{name}", **args)
+        
+    parser.add_argument(f"--version", action="store_true")
 
-    args = parser.parse_args()
+    args = parser.parse_args(args=argv)
     if args.debug:
         log.setLevel(logging.DEBUG)
+
+    if args.version:
+        print(VERSION)
+        exit(0)
 
     if os.path.exists("gputopia-worker.ini"):
         logging.config.fileConfig("gputopia-worker.ini")
 
-    conf = Config(**{k: v for k, v in vars(args).items() if v is not None})
+    conf = Config(**{k: getattr(args, k) for k in arg_names if getattr(args, k) is not None})
 
     wm = WorkerMain(conf)
 

@@ -32,6 +32,7 @@ pytest-asyncio = "^0.21.1"
 pyinstaller = "^5.13.2"
 boto3 = "^1.28.43"
 ruff = "^0.0.288"
+toml = "^0.10.2"
 
 
 [tool.poetry.scripts]

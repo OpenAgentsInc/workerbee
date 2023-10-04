@@ -1,12 +1,13 @@
 import asyncio
 import json
+import re
 import time
 from threading import Thread
 from typing import Any, Optional
 
 import pytest
 import websockets
-from ai_worker.main import WorkerMain, Config
+from ai_worker.main import WorkerMain, Config, main as worker_main
 from gguf_loader.main import download_gguf, main as loader_main, get_size
 
 from pynvml.smi import nvidia_smi
@@ -113,3 +114,21 @@ def test_download_main(capsys):
     loader_main(["TheBloke/WizardLM-7B-uncensored-GGML:q4_K_M"])
     oe = capsys.readouterr().out
     assert "q4_K_M" in oe
+
+
+def test_version(capsys):
+    try:
+        worker_main(["--version"])
+    except SystemExit:
+        pass
+    oe = capsys.readouterr().out
+    re.match(r"\d+\.\d+\.\d+", oe)
+
+
+def test_main(capsys):
+    try:
+        worker_main(["--version"])
+    except SystemExit:
+        pass
+    oe = capsys.readouterr().out
+    re.match(r"\d+\.\d+\.\d+", oe)
