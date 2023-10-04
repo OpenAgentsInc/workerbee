@@ -73,6 +73,8 @@ class Config(BaseSettings):
     test_model: str = ""
     test_max_tokens: int = 16
     low_vram: bool = False
+    main_gpu: int = 0
+    tensor_split: str = ""
     force_layers: int = 0
     layer_offset: int = 2
 
@@ -181,8 +183,11 @@ class WorkerMain:
             # critical... must del this before creating a new app
             del llama_cpp.server.app.llama
 
+        sp = None
+        if self.conf.tensor_split:
+            sp = [float(x) for x in self.conf.tensor_split.split(",")]
         settings = LlamaSettings(model=model_path, n_gpu_layers=await self.guess_layers(model_path), seed=-1,
-                                 embedding=True, cache=True, low_vram=self.conf.low_vram, port=8181)
+                                 embedding=True, cache=True, low_vram=self.conf.low_vram, port=8181, main_gpu=self.conf.main_gpu, tensor_split=sp)
         self.llama = create_llama_app(settings)
         self.llama_cli = AsyncClient(app=self.llama, base_url="http://test")
         self.llama_model = name
