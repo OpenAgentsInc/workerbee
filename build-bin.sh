@@ -16,6 +16,8 @@ python -mvenv "build-$gpu"
 # python is absurd putting these in different places
 . build-$gpu/bin/activate 2> /dev/null || . build-$gpu/scripts/activate
 
+python build-version.py
+
 pip uninstall -y llama-cpp-python
 
 # windows/linux cache rm (poetry cache control is kinda blunt/broken)
