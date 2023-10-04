@@ -72,6 +72,7 @@ class Config(BaseSettings):
     test_max_tokens: int = 16
     low_vram: bool = False
     force_layers: int = 0
+    layer_offset: int = 2
 
 
 def get_free_space_mb(dirname):
@@ -166,7 +167,7 @@ class WorkerMain:
         log.info("guessing layers: %s (tm %s el %s er %s)",
                  est_layers, tot_mem, est_layers, est_ram)
 
-        return min(0, est_layers - 2)
+        return max(0, est_layers - self.conf.layer_offset)
 
     async def load_model(self, name):
         if name == self.llama_model:
