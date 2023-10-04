@@ -16,8 +16,6 @@ python -mvenv "build-$gpu"
 # python is absurd putting these in different places
 . build-$gpu/bin/activate 2> /dev/null || . build-$gpu/scripts/activate
 
-python build-version.py
-
 pip uninstall -y llama-cpp-python
 
 # windows/linux cache rm (poetry cache control is kinda blunt/broken)
@@ -25,6 +23,8 @@ rm -f ~/AppData/Local/pypoetry/Cache/artifacts/*/*/*/*/llama*
 rm -f ~/.cache/pypoetry/artifacts/*/*/*/*/llama*
 
 CMAKE_ARGS="$cmake" FORCE_CMAKE=1 poetry install
+
+python build-version.py
 
 ./pyinstaller.sh $gpu-$arch
 
