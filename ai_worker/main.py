@@ -68,7 +68,7 @@ class Config(BaseSettings):
     auth_key: str = ""
     queen_url: str = DEFAULT_COORDINATOR
     ln_url: str = "DONT_PAY_ME"
-    once: bool = False
+    loops: int = 0
     debug: bool = False
     test_model: str = ""
     test_max_tokens: int = 16
@@ -255,9 +255,11 @@ class WorkerMain:
         log.info("connect queen: %s", msg)
         await ws.send(msg)
 
+        loops = 0
         while not self.stopped:
             await self.run_one(ws)
-            if self.conf.once:
+            loops += 1
+            if self.conf.loops and loops == self.conf.loops:
                 await asyncio.sleep(1)
                 self.stopped = True
 

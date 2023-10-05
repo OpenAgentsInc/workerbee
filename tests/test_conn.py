@@ -96,7 +96,7 @@ async def test_wm():
 
 async def test_run(test_queen):
     queen_events.clear()
-    wm = WorkerMain(Config(once=True, queen_url=test_queen))
+    wm = WorkerMain(Config(loops=1, queen_url=test_queen))
     await wm.run()
     while len(queen_events) == 1:
         time.sleep(0.2)
