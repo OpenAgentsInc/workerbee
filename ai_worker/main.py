@@ -257,11 +257,13 @@ class WorkerMain:
 
         loops = 0
         while not self.stopped:
-            await self.run_one(ws)
-            loops += 1
-            if self.conf.loops and loops == self.conf.loops:
-                await asyncio.sleep(1)
-                self.stopped = True
+            try:
+                await self.run_one(ws)
+            finally:
+                loops += 1
+                if self.conf.loops and loops == self.conf.loops:
+                    await asyncio.sleep(1)
+                    self.stopped = True
 
     async def run_one(self, ws: websockets.WebSocketCommonProtocol):
         req_str = await ws.recv()
