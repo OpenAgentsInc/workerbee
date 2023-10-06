@@ -9,6 +9,30 @@
 - from the command-line try this:  `gputopia-worker --test_model TheBloke/CodeLlama-7B-Instruct-GGUF:Q4_K_M`, maybe paste the results into a <a href="https://discordapp.com/channels/1157469556768514068/1158485685867655351">discord channel</a> for fun and discussion
 - if that works, run `gputopia-worker --ln_url your-ln-url-goes-here`
 
+## Worker command line options:
+
+```
+usage: gputopia-worker [-h] [--auth_key AUTH_KEY] [--queen_url QUEEN_URL] [--ln_url LN_URL] [--loops LOOPS] [--debug]
+                            [--test_model TEST_MODEL] [--test_max_tokens TEST_MAX_TOKENS] [--low_vram] 
+                            [--main_gpu MAIN_GPU] [--tensor_split TENSOR_SPLIT] [--force_layers FORCE_LAYERS]
+                            [--layer_offset LAYER_OFFSET] [--version]
+
+options:
+  -h, --help                          show this help message and exit
+  --version                           output version and exit
+  --auth_key AUTH_KEY                 access_token for account login
+  --queen_url QUEEN_URL               coordinator url (wss://queenbee.gputopia.ai/worker)
+  --ln_url LN_URL                     ln_url (xxxxx@getalby.com)
+  --loops LOOPS                       quit after getting this number of jobs
+  --debug                             verbose debugging info
+  --test_model TEST_MODEL             specify a HF_REPO/PATH[:FILTER?] to test
+  --test_max_tokens TEST_MAX_TOKENS   more == longer test
+  --low_vram                          good if you have more GPU ram than CPU ram
+  --main_gpu MAIN_GPU                 default "0"
+  --tensor_split TENSOR_SPLIT         default "even split", specify comma-delimited list of numbers
+  --force_layers FORCE_LAYERS         default, guess layers based on model size
+  --layer_offset LAYER_OFFSET         default "2" (fudge guess down by 2, leaving more room for context)
+```
 
 ## How to build the worker from source:
 
