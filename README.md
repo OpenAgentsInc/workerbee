@@ -22,7 +22,7 @@ options:
   --version                           output version and exit
   --auth_key AUTH_KEY                 access_token for account login
   --queen_url QUEEN_URL               coordinator url (wss://queenbee.gputopia.ai/worker)
-  --ln_url LN_URL                     ln_url (xxxxx@getalby.com)
+  --ln_address LN_ADDRESS             lightning address (xxxxx@getalby.com)
   --loops LOOPS                       quit after getting this number of jobs
   --debug                             verbose debugging info
   --test_model TEST_MODEL             specify a HF_REPO/PATH[:FILTER?] to test
