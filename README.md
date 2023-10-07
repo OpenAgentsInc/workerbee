@@ -7,12 +7,12 @@
 - for now, we only support alby logins.   i know this isn't ideal.   but it's easier for now.  in the future, any ln-wallet should work to log in and claim control over a given lnurl.
 - download or build a release, stick it somewhere nice (`/usr/bin/gputopia-worker`)
 - from the command-line try this:  `gputopia-worker --test_model TheBloke/CodeLlama-7B-Instruct-GGUF:Q4_K_M`, maybe paste the results into a <a href="https://discordapp.com/channels/1157469556768514068/1158485685867655351">discord channel</a> for fun and discussion
-- if that works, run `gputopia-worker --ln_url your-ln-url-goes-here`
+- if that works, run `gputopia-worker --ln_address your-ln@address-goes-here`
 
 ## Worker command line options:
 
 ```
-usage: gputopia-worker [-h] [--auth_key AUTH_KEY] [--queen_url QUEEN_URL] [--ln_url LN_URL] [--loops LOOPS] [--debug]
+usage: gputopia-worker [-h] [--auth_key AUTH_KEY] [--queen_url QUEEN_URL] [--ln_address LN_URL] [--loops LOOPS] [--debug]
                             [--test_model TEST_MODEL] [--test_max_tokens TEST_MAX_TOKENS] [--low_vram] 
                             [--main_gpu MAIN_GPU] [--tensor_split TENSOR_SPLIT] [--force_layers FORCE_LAYERS]
                             [--layer_offset LAYER_OFFSET] [--version]
