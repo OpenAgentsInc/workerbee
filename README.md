@@ -13,7 +13,7 @@
 
 ```
 usage: gputopia-worker [-h] [--auth_key AUTH_KEY] [--queen_url QUEEN_URL] [--ln_address LN_URL] [--loops LOOPS] [--debug]
-                            [--test_model TEST_MODEL] [--test_max_tokens TEST_MAX_TOKENS] [--low_vram] 
+                            [--test_model TEST_MODEL] [--test_max_tokens TEST_MAX_TOKENS] 
                             [--main_gpu MAIN_GPU] [--tensor_split TENSOR_SPLIT] [--force_layers FORCE_LAYERS]
                             [--layer_offset LAYER_OFFSET] [--version]
 
@@ -27,7 +27,6 @@ options:
   --debug                             verbose debugging info
   --test_model TEST_MODEL             specify a HF_REPO/PATH[:FILTER?] to test
   --test_max_tokens TEST_MAX_TOKENS   more == longer test
-  --low_vram                          good if you have more GPU ram than CPU ram
   --main_gpu MAIN_GPU                 default "0"
   --tensor_split TENSOR_SPLIT         default "even split", specify comma-delimited list of numbers
   --force_layers FORCE_LAYERS         default, guess layers based on model size
