@@ -9,7 +9,7 @@ packages = [{include = "ai_worker"}, {include = "gguf_loader"}]
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.13"
-llama-cpp-python = {extras = ["server"], version = "^0.2.2"}
+llama-cpp-python = {extras = ["server"], version = "0.2.7"}
 pydantic-settings = "^2.0.3"
 fastapi = "^0.103.1"
 websockets = "^11.0.3"
