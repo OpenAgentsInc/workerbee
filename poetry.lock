@@ -470,12 +470,12 @@ files = [
 
 [[package]]
 name = "llama-cpp-python"
-version = "0.2.9"
+version = "0.2.7"
 description = "Python bindings for the llama.cpp library"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "llama_cpp_python-0.2.9.tar.gz", hash = "sha256:e56089fb0833f3acc7dd64c35ef8f82ff9dda42a6e72240ec02f8cc02157d9f6"},
+    {file = "llama_cpp_python-0.2.7.tar.gz", hash = "sha256:2267d3e90bf461ee581dc78332007ea15d9b40e79471850455458b399e3f1887"},
 ]
 
 [package.dependencies]
@@ -1406,4 +1406,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.13"
-content-hash = "b69495239da7e265513ede4946a4b9f082292be1295ebb051fbbca471f955437"
+content-hash = "4a772b4ceb147d63b80a26776ea49d42a5a7ed8fde130247c5e3ee428931373a"
