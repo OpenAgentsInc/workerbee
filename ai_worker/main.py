@@ -196,7 +196,7 @@ class WorkerMain:
         if self.conf.tensor_split:
             sp = [float(x) for x in self.conf.tensor_split.split(",")]
         settings = LlamaSettings(model=model_path, n_gpu_layers=await self.guess_layers(model_path), seed=-1,
-                                 embedding=True, cache=True, low_vram=self.conf.low_vram, port=8181,
+                                 embedding=True, cache=True, port=8181,
                                  main_gpu=self.conf.main_gpu, tensor_split=sp)
         self.llama = create_llama_app(settings)
         self.llama_cli = AsyncClient(app=self.llama, base_url="http://test")
