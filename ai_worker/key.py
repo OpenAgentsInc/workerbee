@@ -1,17 +1,19 @@
 import base64
 import os
 from hashlib import sha256
-from typing import Optional
+from typing import Optional, Union
 
 import coincurve as secp256k1
 
 """Minimalist pub/priv key classes for signing and verification based on coincurve"""
 
+
 class PublicKey:
-    def __init__(self, raw_bytes: bytes) -> None:
+    def __init__(self,
+                 raw_bytes: Union[bytes, "PrivateKey", secp256k1.keys.PublicKey, secp256k1.keys.PublicKeyXOnly, str]):
         """
         :param raw_bytes: The formatted public key.
-        :type data: bytes
+        :type data: bytes, private key to copy, or hex str
         """
         if isinstance(raw_bytes, PrivateKey):
             self.raw_bytes = raw_bytes.public_key.raw_bytes
@@ -27,13 +29,13 @@ class PublicKey:
     def hex(self) -> str:
         return self.raw_bytes.hex()
 
-    def verify(self, sig: bytes, message: bytes) -> bool:
+    def verify(self, sig: str, message: bytes) -> bool:
         pk = secp256k1.PublicKeyXOnly(self.raw_bytes)
-        return pk.verify(sig, message)
+        return pk.verify(bytes.fromhex(sig), message)
 
     @classmethod
-    def from_hex(cls, hex: str) -> 'PublicKey':
-        return cls(bytes.fromhex(hex))
+    def from_hex(cls, hex_: str, /) -> 'PublicKey':
+        return cls(bytes.fromhex(hex_))
 
     def __repr__(self):
         pubkey = self.hex()
@@ -76,9 +78,9 @@ class PrivateKey:
         self.public_key = PublicKey(sk.public_key_xonly)
 
     @classmethod
-    def from_hex(cls, hex: str):
+    def from_hex(cls, hex_: str, /):
         """Load a PrivateKey from its hex form."""
-        return cls(bytes.fromhex(hex))
+        return cls(bytes.fromhex(hex_))
 
     def __hash__(self):
         return hash(self.raw_secret)
@@ -91,7 +93,7 @@ class PrivateKey:
 
     def sign(self, message: bytes, aux_randomness: bytes = b'') -> str:
         sk = secp256k1.PrivateKey(self.raw_secret)
-        return sk.sign_schnorr(message, aux_randomness)
+        return sk.sign_schnorr(message, aux_randomness).hex()
 
     def __repr__(self):
         pubkey = self.public_key.hex()
@@ -117,14 +119,15 @@ def test_cp():
     pk2 = PrivateKey(pk.raw_secret)
     assert pk == pk2
 
+
 def test_fromhex():
     pk = PrivateKey()
     pk2 = PrivateKey.from_hex(pk.hex())
     assert pk == pk2
 
+
 def test_sig():
     pk = PrivateKey()
     pub = pk.public_key
     sig = pk.sign(b'1' * 32)
-    assert pub.verify(sig, b'1' * 32) 
-
+    assert pub.verify(sig, b'1' * 32)

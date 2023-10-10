@@ -28,6 +28,7 @@ from dotenv import load_dotenv
 from gguf_loader.main import get_size
 
 from .gguf_reader import GGUFReader
+from .key import PrivateKey
 from .version import VERSION
 
 APP_NAME = "gputopia"
@@ -57,9 +58,9 @@ class ConnectMessage(BaseModel):
     worker_version: str
     pubkey: str
     sig: str = ""
-    ln_url: str     # sent for back compat.   will drop this eventually
+    ln_url: str     # sent for back compat.  will drop this eventually
     ln_address: str
-    auth_key: str
+    auth_key: str   # user private auth token for queenbee
     cpu_count: int
     disk_space: int
     vram: int
@@ -86,6 +87,7 @@ class Config(BaseSettings):
     tensor_split: str = Field("", description="comma-delimited list of ratio numbers, one for each gpu")
     force_layers: int = Field(0, description="force layers to load in the gpu")
     layer_offset: int = Field(2, description="reduce the layer guess by this")
+    config: str = Field(os.path.expanduser("~/.config/gputopia"), description="config file location")
 
 
 def get_free_space_mb(dirname):
@@ -103,26 +105,36 @@ def get_free_space_mb(dirname):
 class WorkerMain:
     def __init__(self, conf: Config):
         self.__connect_info: Optional[ConnectMessage] = None
-        self.privkey = self._gen_or_load_priv()
-        self.__sk = PrivateKey(bytes.fromhex(private_key_hex))
-        self.pubkey = self.sk.public_key.hex()
         self.conf = conf
+        self.privkey = self._gen_or_load_priv()
+        self.__sk = PrivateKey(bytes.fromhex(self.privkey))
+        self.pubkey = self.__sk.public_key.hex()
         self.stopped = False
         self.llama = None
         self.llama_model = None
         self.llama_cli: Optional[AsyncClient] = None
 
-    @staticmethod
-    def _gen_or_load_priv() -> str:
-        pass
+    def _gen_or_load_priv(self) -> str:
+        cfg = self.conf.config
+        if os.path.exists(cfg):
+            with open(cfg, encoding="utf8") as fh:
+                js = json.load(fh)
+        else:
+            js = {}
+        if not js.get("privkey"):
+            js["privkey"] = os.urandom(32).hex()
+            with open(cfg, "w", encoding="utf8") as fh:
+                json.dump(js, fh, indent=4)
+
+        return js["privkey"]
 
     def sign(self, msg: ConnectMessage):
-        js = msg.model_dump("json")
+        js = msg.model_dump(mode="json")
         js.pop("sig", None)
         # this is needed for a consistent dump!
         dump = json.dumps(js, separators=(",", ":"), sort_keys=True, ensure_ascii=False)
-        id = sha256(dump)
-        msg.sig = self.__sk.sign(id)
+        h32 = sha256(dump.encode()).digest()
+        msg.sig = self.__sk.sign(h32)
 
     async def test_model(self):
         pprint(self.connect_info().model_dump())
@@ -231,6 +243,7 @@ class WorkerMain:
             cpu_count=multiprocessing.cpu_count(),
             vram=psutil.virtual_memory().available,
         )
+
         self.sign(connect_msg)
 
         try:
@@ -370,6 +383,8 @@ For example:
             help=description,
             action="store_true" if field.annotation is bool else "store",
         )
+        if field.default:
+            args["default"] = field.default
         if field.annotation is bool:
             args.pop("type")
         arg_names.append(name)
@@ -381,6 +396,13 @@ For example:
     parser.add_argument(f"--ln_url", type=str, help=argparse.SUPPRESS)
 
     args = parser.parse_args(args=argv)
+
+    if os.path.exists(args.config):
+        with open(args.config, "r", encoding="utf8") as fh:
+            for k, v in json.load(fh).items():
+                cv = getattr(args, k)
+                if cv is None or cv == Config.model_fields[k].default:
+                    setattr(args, k, v)
 
     if args.debug:
         log.setLevel(logging.DEBUG)
