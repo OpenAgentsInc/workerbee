@@ -88,7 +88,7 @@ class Config(BaseSettings):
     force_layers: int = Field(0, description="force layers to load in the gpu")
     layer_offset: int = Field(2, description="reduce the layer guess by this")
     config: str = Field(os.path.expanduser("~/.config/gputopia"), description="config file location")
-
+    privkey: str = Field("", description=argparse.SUPPRESS, exclude=True)
 
 def get_free_space_mb(dirname):
     """Return folder/drive free space (in megabytes)."""
@@ -106,27 +106,27 @@ class WorkerMain:
     def __init__(self, conf: Config):
         self.__connect_info: Optional[ConnectMessage] = None
         self.conf = conf
-        self.privkey = self._gen_or_load_priv()
-        self.__sk = PrivateKey(bytes.fromhex(self.privkey))
+        self._gen_or_load_priv()
+        self.__sk = PrivateKey(bytes.fromhex(self.conf.privkey))
         self.pubkey = self.__sk.public_key.hex()
         self.stopped = False
         self.llama = None
         self.llama_model = None
         self.llama_cli: Optional[AsyncClient] = None
 
-    def _gen_or_load_priv(self) -> str:
-        cfg = self.conf.config
-        if os.path.exists(cfg):
-            with open(cfg, encoding="utf8") as fh:
-                js = json.load(fh)
-        else:
-            js = {}
-        if not js.get("privkey"):
-            js["privkey"] = os.urandom(32).hex()
-            with open(cfg, "w", encoding="utf8") as fh:
-                json.dump(js, fh, indent=4)
-
-        return js["privkey"]
+    def _gen_or_load_priv(self) -> None:
+        if not self.conf.privkey:
+            cfg = self.conf.config
+            if os.path.exists(cfg):
+                with open(cfg, encoding="utf8") as fh:
+                    js = json.load(fh)
+            else:
+                js = {}
+            if not js.get("privkey"):
+                js["privkey"] = os.urandom(32).hex()
+                with open(cfg, "w", encoding="utf8") as fh:
+                    json.dump(js, fh, indent=4)
+            self.conf.privkey = js["privkey"]
 
     def sign(self, msg: ConnectMessage):
         js = msg.model_dump(mode="json")
@@ -419,6 +419,7 @@ For example:
 
     conf = Config(**{k: getattr(args, k) for k in arg_names if getattr(args, k) is not None})
 
+    log.debug("config: %s", conf)
     wm = WorkerMain(conf)
 
     asyncio.run(wm.run())

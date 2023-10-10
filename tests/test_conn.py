@@ -3,7 +3,7 @@ import json
 import re
 import time
 from threading import Thread
-from typing import Any, Optional
+from typing import Any
 
 import pytest
 import websockets
@@ -76,7 +76,7 @@ def test_conn_str(tmp_path):
     pub.verify(sig, orig.encode())
 
     wm2 = WorkerMain(Config(config=str(tmp_path / "tmp")))
-    assert wm2.privkey == wm.privkey
+    assert wm2.conf.privkey == wm.conf.privkey
 
     try:
         inst = nvidia_smi.getInstance()
@@ -153,6 +153,10 @@ def test_cfg(capsys, tmp_path):
     worker_main(["--config", str(tmp_path / "tmp")])
 
     oe = capsys.readouterr().out
+
     # log shows pubkey and total_tokens because debug and test_models are set
     assert re.search(r"pubkey", oe)
     assert re.search(r"total_tokens", oe)
+
+    # privkey never logged!
+    assert not re.search(r"privkey", oe)
