@@ -14,3 +14,17 @@ async def test_layer_est():
 
 
 
+async def test_loader_scan_models():
+    config = Config()
+    wm = WorkerMain(config)
+    path = await wm.download_model("TheBloke/CodeLlama-7B-Instruct-GGUF:Q4_K_M")
+    assert "TheBloke/CodeLlama-7B-Instruct-GGUF:Q4_K_M" in wm.get_model_list()
+    wm.llama_model = "foo"
+    assert "foo" in wm.get_model_list()
+    wm.llama_model = None
+    before = len(wm.get_model_list())
+    wm.llama_model = "TheBloke/CodeLlama-7B-Instruct-GGUF:Q4_K_M"
+    assert len(wm.get_model_list()) == before
+    assert wm.get_model_list()[0] == wm.llama_model
+
+

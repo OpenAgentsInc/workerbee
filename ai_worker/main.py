@@ -67,6 +67,7 @@ class ConnectMessage(BaseModel):
     cl_driver_version: Optional[str] = None
     cl_gpus: Optional[List[GpuInfo]] = []
     web_gpus: Optional[List[GpuInfo]] = []
+    models: List[str] = []
 
 
 class Config(BaseSettings):
@@ -205,6 +206,8 @@ class WorkerMain:
     def _get_connect_info(self) -> ConnectMessage:
         disk_space = get_free_space_mb(".")
 
+        self.get_model_list()
+
         connect_msg = ConnectMessage(
             worker_version=VERSION,
             worker_id=self.conf.worker_id,
@@ -214,6 +217,7 @@ class WorkerMain:
             disk_space=int(disk_space),
             cpu_count=multiprocessing.cpu_count(),
             vram=psutil.virtual_memory().available,
+            models=model_list
         )
 
         try:
@@ -314,6 +318,15 @@ class WorkerMain:
         loop = asyncio.get_running_loop()
         path = await loop.run_in_executor(None, lambda: download_gguf(name))
         return path
+
+    def get_model_list(self):
+        from gguf_loader.main import get_model_list
+        lst = get_model_list()
+        if self.llama_model:
+            lst = set(lst)
+            lst.discard(self.llama_model)
+            lst = [self.llama_model] + list(lst)
+        return lst
 
     def report_done(self, name):
         print("\r", name, 100)
