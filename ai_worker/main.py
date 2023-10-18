@@ -8,6 +8,7 @@ import multiprocessing
 import os
 import platform
 import sys
+import tempfile
 import time
 from pprint import pprint
 from typing import Optional, List
@@ -23,6 +24,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pynvml.smi import nvidia_smi
 import pyopencl
 from dotenv import load_dotenv
+
+try:
+    from .fine_tune import FineTuner
+except ImportError:
+    FineTuner = None
 
 from gguf_loader.main import get_size
 
@@ -54,8 +60,9 @@ class GpuInfo(BaseModel):
 
 class ConnectMessage(BaseModel):
     worker_version: str
+    capabilities: list[str]
     worker_id: str
-    ln_url: str     # sent for back compat.   will drop this eventually
+    ln_url: str  # sent for back compat.   will drop this eventually
     ln_address: str
     auth_key: str
     cpu_count: int
@@ -85,6 +92,8 @@ class Config(BaseSettings):
     tensor_split: str = Field("", description="comma-delimited list of ratio numbers, one for each gpu")
     force_layers: int = Field(0, description="force layers to load in the gpu")
     layer_offset: int = Field(2, description="reduce the layer guess by this")
+    tmp_dir: str = Field(os.path.join(tempfile.gettempdir(), "gputopia-worker"),
+                         description="temp folder for data files and checkpoints")
 
 
 def get_free_space_mb(dirname):
@@ -107,6 +116,8 @@ class WorkerMain:
         self.llama = None
         self.llama_model = None
         self.llama_cli: Optional[AsyncClient] = None
+        if FineTuner:
+            self.fine_tuner = FineTuner(self.conf)
 
     async def test_model(self):
         pprint(self.connect_info().model_dump())
@@ -205,10 +216,18 @@ class WorkerMain:
     def _get_connect_info(self) -> ConnectMessage:
         disk_space = get_free_space_mb(".")
 
+        caps = []
+
+        caps += ['llama-infer']
+
+        if self.fine_tuner:
+            caps += ["llama-fine-tune"]
+
         connect_msg = ConnectMessage(
             worker_version=VERSION,
+            capabilitied=caps,
             worker_id=self.conf.worker_id,
-            ln_url=self.conf.ln_address,        # todo: remove eventually
+            ln_url=self.conf.ln_address,  # todo: remove eventually
             ln_address=self.conf.ln_address,
             auth_key=self.conf.auth_key,
             disk_space=int(disk_space),
@@ -285,16 +304,20 @@ class WorkerMain:
 
             log.debug("loading %s", model)
 
-            await self.load_model(model)
-
             st = time.monotonic()
-            if req.openai_req.get("stream"):
+            if req.openai_url == "/v1/fine_tuning/jobs":
+                await self.get_model(model)
+                res = await self.fine_tuner.fine_tune(req.openai_req)
+                await ws.send(json.dumps(res))
+            elif req.openai_req.get("stream"):
+                await self.load_model(model)
                 async with aconnect_sse(self.llama_cli, "POST", req.openai_url, json=req.openai_req) as sse:
                     async for event in sse.aiter_sse():
                         if event.data != "[DONE]":
                             await ws.send(event.data)
                 await ws.send("{}")
             else:
+                await self.load_model(model)
                 res: Response = await self.llama_cli.post(req.openai_url, json=req.openai_req)
                 await ws.send(res.text)
             en = time.monotonic()
