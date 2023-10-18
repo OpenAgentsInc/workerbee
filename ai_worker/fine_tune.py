@@ -1,5 +1,6 @@
 import base64
 import hashlib
+import json
 import logging
 import os
 import random
@@ -11,6 +12,8 @@ from httpx import AsyncClient, Response
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 
+from ai_worker.jsonlines import load_jsonlines
+
 MAX_CONTEXT = 300000
 
 log = logging.getLogger(__name__)
@@ -19,6 +22,7 @@ log = logging.getLogger(__name__)
 class FineTuner:
     def __init__(self, conf):
         self.conf = conf
+        os.makedirs(self.conf.tmp_dir, exist_ok=True)
 
     def temp_file(self, name):
         return os.path.join(self.conf.tmp_dir, name)
@@ -29,8 +33,10 @@ class FineTuner:
     def massage_fine_tune(self, file, job):
         cnt = 0
         training_split_pct = job.get("hyperparameters", {}).get("training_split", 0.8)
+
         train_file = file + ".train"
         eval_file = file + ".eval"
+
         with open(train_file, "w") as tf:
             with open(eval_file, "w") as ef:
                 with open(file, "r") as inp:
@@ -49,23 +55,41 @@ class FineTuner:
     async def fine_tune(self, job):
         log.info("fine tuning: %s", job)
 
+        yield {"status": "downloading_data"}
+
+        base_model = job["model"]
         training_url = job["training_file"]
         training_file = await self.download_file(training_url)
 
         train_file, eval_file = self.massage_fine_tune(training_file, job)
 
-        train_dataset = load_dataset('json', train_file)
-        eval_dataset = load_dataset('json', eval_file)
+        train_dataset = load_jsonlines(open(train_file))
+        eval_dataset = load_jsonlines(open(eval_file))
+
+        # todo: use user's model request
 
         base_model_id = "mistralai/Mistral-7B-v0.1"
-        bnb_config = BitsAndBytesConfig(
+
+        # todo: use hyperparams and Q_ filter, if present, for this
+
+        hp = job.get("hyperparameters", {})
+
+        args = {}
+
+        yield {"status": "loading_model"}
+
+        args.update(dict(
             load_in_4bit=True,
             bnb_4bit_use_double_quant=True,
             bnb_4bit_quant_type="nf4",
             bnb_4bit_compute_dtype=torch.bfloat16
-        )
+        ))
 
-        model = AutoModelForCausalLM.from_pretrained(base_model_id, quantization_config=bnb_config)
+        bnb_config = BitsAndBytesConfig(**args)
+
+        # todo: ideally we use llama cpp, but the cuda support for finetune isn't there
+
+        model = AutoModelForCausalLM.from_pretrained(base_model_id, quantization_config=bnb_config, device_map="auto")
 
         tokenizer = AutoTokenizer.from_pretrained(
             base_model_id,
@@ -171,17 +195,16 @@ class FineTuner:
         model.config.use_cache = False  # silence the warnings. Please re-enable for inference!
         trainer.train()
 
-        res = {"done": True, "checkpoint": str(base64.b64encode(b"checkpoint"))}
-        return res
+        res = {"status": "done", "checkpoint": str(base64.b64encode(b"checkpoint"))}
+        yield res
 
-    async def download_file(self, training_url) -> str:
-        output_file = self.temp_file(hashlib.md5(training_url).digest().hex())
+    async def download_file(self, training_url: str) -> str:
+        output_file = self.temp_file(hashlib.md5(training_url.encode()).hexdigest())
         if not os.path.exists(output_file):
             with open(output_file + ".tmp", "wb") as fh:
-                with AsyncClient() as cli:
+                async with AsyncClient() as cli:
                     res: Response = await cli.get(training_url)
-                    async with res.stream as s:
-                        async for chunk in s.aiter_bytes():
-                            fh.write(chunk)
+                    async for chunk in res.aiter_bytes():
+                        fh.write(chunk)
             os.replace(output_file + ".tmp", output_file)
         return output_file
