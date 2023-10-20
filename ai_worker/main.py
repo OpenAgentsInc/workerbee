@@ -307,8 +307,8 @@ class WorkerMain:
             st = time.monotonic()
             if req.openai_url == "/v1/fine_tuning/jobs":
                 await self.get_model(model)
-                res = await self.fine_tuner.fine_tune(req.openai_req)
-                await ws.send(json.dumps(res))
+                async for event in self.fine_tuner.fine_tune(req.openai_req):
+                    await ws.send(json.dumps(event))
             elif req.openai_req.get("stream"):
                 await self.load_model(model)
                 async with aconnect_sse(self.llama_cli, "POST", req.openai_url, json=req.openai_req) as sse:

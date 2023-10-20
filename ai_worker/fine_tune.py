@@ -264,7 +264,6 @@ class FineTuner:
 
         tmp = self.temp_file(run_name, wipe=True)
         tokenizer.save_pretrained(tmp)
-        log.info("SAVED", os.listdir(tmp))
 
         self.return_final(run_name, model, base_model_id, cb)
 
@@ -299,6 +298,16 @@ class FineTuner:
         gc.collect()
         
         shutil.rmtree(tmp)
+
+        tokenizer = AutoTokenizer.from_pretrained(
+            base_model_id,
+            padding_side="left",
+            add_eos_token=True,
+            add_bos_token=True,
+        )
+        tokenizer.pad_token = tokenizer.eos_token
+        tokenizer.save_pretrained(tmp)
+ 
         model.save_pretrained(tmp)
         
         # convert to gguf for fast inference
