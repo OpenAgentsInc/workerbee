@@ -16,6 +16,9 @@ from httpx import AsyncClient, Response
 
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, TrainerCallback 
+from peft import prepare_model_for_kbit_training, PeftModel, LoraConfig, get_peft_model
+from accelerate import FullyShardedDataParallelPlugin, Accelerator
+from torch.distributed.fsdp.fully_sharded_data_parallel import FullOptimStateDictConfig, FullStateDictConfig
 
 from gguf_loader.convert import main as gguf_main
 
@@ -168,12 +171,8 @@ class FineTuner:
 
         model = AutoModelForCausalLM.from_pretrained(base_model_id, quantization_config=bnb_config, device_map="auto", resume_download=True)
 
-        from peft import prepare_model_for_kbit_training, PeftModel
-
         model.gradient_checkpointing_enable()
         model = prepare_model_for_kbit_training(model)
-
-        from peft import LoraConfig, get_peft_model
 
         config = LoraConfig(
             r=32,
@@ -195,9 +194,6 @@ class FineTuner:
 
         model = get_peft_model(model, config)
 
-        from accelerate import FullyShardedDataParallelPlugin, Accelerator
-        from torch.distributed.fsdp.fully_sharded_data_parallel import FullOptimStateDictConfig, FullStateDictConfig
-
         fsdp_plugin = FullyShardedDataParallelPlugin(
             state_dict_config=FullStateDictConfig(offload_to_cpu=True, rank0_only=False),
             optim_state_dict_config=FullOptimStateDictConfig(offload_to_cpu=True, rank0_only=False),
@@ -211,7 +207,7 @@ class FineTuner:
             model.is_parallelizable = True
             model.model_parallel = True
 
-        project = "journal-finetune"
+        project = "finetune"
         base_model_name = base_model_id.split("/")[-1]
         run_name = base_model_name + "-" + project + "-" + os.urandom(16).hex()
         output_dir = "./" + run_name
@@ -268,10 +264,11 @@ class FineTuner:
 
         tmp = self.temp_file(run_name, wipe=True)
         tokenizer.save_pretrained(tmp)
+        log.info("SAVED", os.listdir(tmp))
 
-        self.return_final(run_name, model, cb)
+        self.return_final(run_name, model, base_model_id, cb)
 
-    def return_final(self, run_name, model, cb):
+    def return_final(self, run_name, model, base_model_id, cb):
         log.info("return final")
 
         tmp = self.temp_file(run_name)
@@ -279,7 +276,6 @@ class FineTuner:
         # send up lora
         model.save_pretrained(tmp, safe_serialization=True)
         gz = gzip(tmp)
-        shutil.rmtree(tmp)
         with open(gz, "rb") as fil:
             while True:
                 dat = fil.read(100000)
@@ -296,10 +292,13 @@ class FineTuner:
         del model
         gc.collect()
 
+        # reload with f16
         model = PeftModel.from_pretrained(AutoModelForCausalLM.from_pretrained(base_model_id, torch_dtype=torch.float16, local_files_only=True, device_map="auto"), tmp)
         model = model.merge_and_unload()
         
         gc.collect()
+        
+        shutil.rmtree(tmp)
         model.save_pretrained(tmp)
         
         # convert to gguf for fast inference

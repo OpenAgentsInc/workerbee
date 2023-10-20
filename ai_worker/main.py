@@ -225,7 +225,7 @@ class WorkerMain:
 
         connect_msg = ConnectMessage(
             worker_version=VERSION,
-            capabilitied=caps,
+            capabilities=caps,
             worker_id=self.conf.worker_id,
             ln_url=self.conf.ln_address,  # todo: remove eventually
             ln_address=self.conf.ln_address,

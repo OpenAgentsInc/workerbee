@@ -58,7 +58,7 @@ async def test_peft_unload_save_and_gguf(ft):
     
     log.info("call rf")
 
-    ft.return_final("test", model, cb)
+    ft.return_final("test", model, base_model_id, cb)
 
     log.debug(got)
 
@@ -79,7 +79,8 @@ async def test_e2e(ft):
                 got["lora"] += 1
             elif res.get("gguf"):
                 got["gguf"] += 1
-        log.info("test-result: %s", res)
+        else:
+            log.info("test-result: %s", res)
         fin.append(res)
 
     log.debug(got)
