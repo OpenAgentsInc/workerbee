@@ -6,4 +6,6 @@ set -o xtrace
 
 ./build-bin.sh opencl linux-64 "-DLLAMA_CLBLAST=ON" 
 
+./build-bin.sh cuda-torch linux-64 "-DLLAMA_CLBLAST=ON" 
+
 ./upload.sh

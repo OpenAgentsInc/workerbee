@@ -41,8 +41,7 @@ if hasattr(faulthandler, 'register') and hasattr(signal, 'SIGUSR1'):
 
 NDArray: TypeAlias = 'np.ndarray[Any, Any]'
 
-ARCH=gguf.MODEL_ARCH.LLAMA
-NAMES=gguf.MODEL_TENSOR_NAMES[ARCH]
+ARCH = gguf.MODEL_ARCH.LLAMA
 
 DEFAULT_CONCURRENCY = 8
 #
@@ -145,7 +144,6 @@ GGML_FILE_TYPE_TO_DATA_TYPE: dict[GGMLFileType, DataType] = {
 class Params:
     n_vocab:    int
     n_embd:     int
-    n_mult:     int
     n_layer:    int
     n_ctx:      int
     n_ff:       int
@@ -160,15 +158,6 @@ class Params:
 
     # path to the directory containing the model files
     path_model: Path | None = None
-
-    @staticmethod
-    def find_n_mult(n_ff: int, n_embd: int) -> int:
-        # hardcoded magic range
-        for n_mult in range(8192, 1, -1):
-            calc_ff = (((8*n_embd) // 3 + n_mult - 1) // n_mult)*n_mult
-            if calc_ff == n_ff:
-                return n_mult
-        raise Exception(f"failed to find n_mult for (n_ff={n_ff}, n_embd={n_embd}).")
 
     @staticmethod
     def guessed(model: LazyModel) -> Params:
@@ -197,7 +186,6 @@ class Params:
         return Params(
             n_vocab    = n_vocab,
             n_embd     = n_embd,
-            n_mult     = n_mult,
             n_layer    = n_layer,
             n_ctx      = -1,
             n_ff       = n_ff,
@@ -225,8 +213,6 @@ class Params:
         else:
             f_rope_scale = None
 
-        n_mult = Params.find_n_mult(n_ff, n_embd)
-
         if "max_sequence_length" in config:
             n_ctx = config["max_sequence_length"]
         elif "max_position_embeddings" in config:
@@ -238,7 +224,6 @@ class Params:
         return Params(
             n_vocab          = n_vocab,
             n_embd           = n_embd,
-            n_mult           = n_mult,
             n_layer          = n_layer,
             n_ctx            = n_ctx,
             n_ff             = n_ff,
@@ -250,7 +235,7 @@ class Params:
         )
 
     # LLaMA v2 70B params.json
-    # {"dim": 8192, "multiple_of": 4096, "ffn_dim_multiplier": 1.3, "n_heads": 64, "n_kv_heads": 8, "n_layers": 80, "norm_eps": 1e-05, "vocab_size": -1
+    # {"dim": 8192, "multiple_of": 4096, "ffn_dim_multiplier": 1.3, "n_heads": 64, "n_kv_heads": 8, "n_layers": 80, "norm_eps": 1e-05, "vocab_size": -1}
     @staticmethod
     def loadOriginalParamsJson(model: LazyModel, config_path: Path) -> Params:
         config = json.load(open(config_path))
@@ -258,7 +243,6 @@ class Params:
         n_vocab          = config["vocab_size"] if "vocab_size" in config else -1
         n_embd           = config["dim"]
         n_layer          = config["n_layers"]
-        n_mult           = config["multiple_of"]
         n_ff             = -1
         n_head           = config["n_heads"]
         n_head_kv        = config["n_kv_heads"] if "n_kv_heads" in config else n_head
@@ -285,7 +269,6 @@ class Params:
         return Params(
             n_vocab          = n_vocab,
             n_embd           = n_embd,
-            n_mult           = n_mult,
             n_layer          = n_layer,
             n_ctx            = n_ctx,
             n_ff             = n_ff,
@@ -355,29 +338,15 @@ class BpeVocab:
     def bpe_tokens(self) -> Iterable[tuple[bytes, float, gguf.TokenType]]:
         tokenizer = self.bpe_tokenizer
         from transformers.models.gpt2 import tokenization_gpt2  # type: ignore[import]
-        byte_encoder = tokenization_gpt2.bytes_to_unicode()
-        byte_decoder = {v: k for k, v in byte_encoder.items()}
-        score = 0.0
-        for i, item in enumerate(tokenizer):
-            text: bytes = item.encode("utf-8")
-            # FIXME: These shouldn't be hardcoded, but it's probably better than the current behavior?
-            if i <= 258 and text.startswith(b'<') and text.endswith(b'>'):
-                if i == 0 and text == b'<unk>':
-                    toktype = gguf.TokenType.UNKNOWN
-                elif i == 1 or i == 2:
-                    toktype = gguf.TokenType.CONTROL
-                elif i >= 3 and text.startswith(b'<0x'):
-                    toktype = gguf.TokenType.BYTE
-                else:
-                    toktype = gguf.TokenType.NORMAL
-            else:
-                toktype = gguf.TokenType.NORMAL
-            yield text, score, toktype
+        reverse_vocab = {id: encoded_tok for encoded_tok, id in tokenizer.items()}
+
+        for i, _ in enumerate(tokenizer):
+            yield reverse_vocab[i], 0.0, gguf.TokenType.NORMAL
 
     def added_tokens(self) -> Iterable[tuple[bytes, float, gguf.TokenType]]:
         for text in self.added_tokens_list:
             score = -1000.0
-            yield text.encode("utf-8"), score, gguf.TokenType.USER_DEFINED
+            yield text.encode("utf-8"), score, gguf.TokenType.CONTROL
 
     def all_tokens(self) -> Iterable[tuple[bytes, float, gguf.TokenType]]:
         yield from self.bpe_tokens()
@@ -455,7 +424,7 @@ Vocab: TypeAlias = 'BpeVocab | SentencePieceVocab'
 def permute(weights: NDArray, n_head: int, n_head_kv: int) -> NDArray:
     #print( "permute debug " + str(weights.shape[0]) + " x " + str(weights.shape[1]) + " nhead " + str(n_head) + " nheadkv " + str(n_kv_head) )
     if n_head_kv is not None and n_head != n_head_kv:
-        n_head //= n_head_kv
+        n_head = n_head_kv
     return (weights.reshape(n_head, 2, weights.shape[0] // n_head // 2, *weights.shape[1:])
                 .swapaxes(1, 2)
                 .reshape(weights.shape))
@@ -969,7 +938,7 @@ class OutputFile:
         of.close()
 
 def pick_output_type(model: LazyModel, output_type_str: str | None) -> GGMLFileType:
-    wq_type = model[NAMES[gguf.MODEL_TENSOR.ATTN_Q].format(bid=0)+".weight"].data_type
+    wq_type = model[gguf.TENSOR_NAMES[gguf.MODEL_TENSOR.ATTN_Q].format(bid=0)+".weight"].data_type
 
     if output_type_str == "f32" or (output_type_str is None and wq_type == DT_F32):
         return GGMLFileType.AllF32
