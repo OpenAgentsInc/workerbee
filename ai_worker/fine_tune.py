@@ -111,6 +111,8 @@ class FineTuner:
         log.info("DONE")
         t.join()
 
+        shutil.rmtree(training_file)
+
     def _fine_tune(self, job, cb):
         try:
             self._unsafe_fine_tune(job, cb)
@@ -275,6 +277,8 @@ class FineTuner:
         tokenizer.save_pretrained(tmp)
 
         self.return_final(run_name, model, base_model_id, cb)
+        
+        shutil.rmtree(output_dir)
 
     def return_final(self, run_name, model, base_model_id, cb):
         log.info("return final")
@@ -321,7 +325,9 @@ class FineTuner:
         
         # convert to gguf for fast inference
         log.info("ggml convert")
+        
         gguf_main([tmp])
+        
         gg = tmp + "/ggml-model-f16.gguf"
         with open(gg, "rb") as fil:
             while True:
@@ -332,7 +338,6 @@ class FineTuner:
                 cb(res)
         
         shutil.rmtree(tmp)
-        shutil.rmtree(output_dir)
         
         res = {"status": "done"}
         log.info("done train")
