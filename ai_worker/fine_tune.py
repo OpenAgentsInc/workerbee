@@ -47,10 +47,19 @@ class FineTuner:
     def massage_line(self, ln, job):
         # toss our role for now, for some reason it didn't work
         # todo: check for role support in template
+        j = json.loads(ln)
+        
+        if pr := j.get("prompt"):
+            # todo: use templates properly to massage data for instruct vs chat
+            j = json.loads(ln)
+            cm = j["completion"]
+            j = {"messages": [{"role":"user","content":pr},{"role":"assistant","content":cm}]}
+        
         if "mistral" in job["model"].lower():
             j = json.loads(ln)
             j["messages"] = [m for m in j["messages"] if m["role"] != "system"]
             ln = json.dumps(j) + "\n"
+        
         return ln
 
     def massage_fine_tune(self, file, job):
