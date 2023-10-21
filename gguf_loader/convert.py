@@ -29,7 +29,7 @@ import numpy as np
 from sentencepiece import SentencePieceProcessor  # type: ignore[import]
 
 import os
-import gguf
+from . import gguf
 
 if TYPE_CHECKING:
     from typing import TypeAlias
