@@ -245,7 +245,7 @@ class FineTuner:
             args=transformers.TrainingArguments(
                 output_dir=output_dir,
                 warmup_steps=1,
-                per_device_train_batch_size=hp.get("batch_size", 4),
+                per_device_train_batch_size=hp.get("batch_size", 2),
                 gradient_accumulation_steps=hp.get("accumulation_steps", 4),
                 max_steps=hp.get("max_steps", -1),
                 num_train_epochs=hp.get("n_epochs", 3), # use openai terminology here
