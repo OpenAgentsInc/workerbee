@@ -161,7 +161,7 @@ class FineTuner:
         # sadly, does not take generators, just loads everything in ram
         tokenizer.pad_token = tokenizer.eos_token
         # todo: derive from model params
-        max_length = 4096
+        max_length = hp.get("pad_length", 512)
         def generate_and_tokenize_prompt(prompt):
             # all input is openai formatted, and we clean it up above if needed
             pr = prompt["messages"]
