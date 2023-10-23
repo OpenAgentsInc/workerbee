@@ -12,7 +12,7 @@ import time
 from hashlib import sha256
 from pprint import pprint
 from typing import Optional, List
-
+from base64 import urlsafe_b64encode as b64encode, urlsafe_b64decode as b64decode
 import psutil
 import websockets
 from httpx import Response, AsyncClient
@@ -107,8 +107,8 @@ class WorkerMain:
         self.__connect_info: Optional[ConnectMessage] = None
         self.conf = conf
         self._gen_or_load_priv()
-        self.__sk = PrivateKey(bytes.fromhex(self.conf.privkey))
-        self.pubkey = self.__sk.public_key.hex()
+        self.__sk = PrivateKey(b64decode(self.conf.privkey))
+        self.pubkey = self.__sk.public_key.to_b64()
         self.stopped = False
         self.llama = None
         self.llama_model = None
@@ -123,7 +123,7 @@ class WorkerMain:
             else:
                 js = {}
             if not js.get("privkey"):
-                js["privkey"] = os.urandom(32).hex()
+                js["privkey"] = b64encode(os.urandom(32)).decode()
                 with open(cfg, "w", encoding="utf8") as fh:
                     json.dump(js, fh, indent=4)
             self.conf.privkey = js["privkey"]

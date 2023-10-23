@@ -13,7 +13,7 @@ class PublicKey:
                  raw_bytes: Union[bytes, "PrivateKey", secp256k1.keys.PublicKey, secp256k1.keys.PublicKeyXOnly, str]):
         """
         :param raw_bytes: The formatted public key.
-        :type data: bytes, private key to copy, or hex str
+        :type data: bytes, private key to copy, or b64 str
         """
         if isinstance(raw_bytes, PrivateKey):
             self.raw_bytes = raw_bytes.public_key.raw_bytes
@@ -22,23 +22,23 @@ class PublicKey:
         elif isinstance(raw_bytes, secp256k1.keys.PublicKeyXOnly):
             self.raw_bytes = raw_bytes.format()
         elif isinstance(raw_bytes, str):
-            self.raw_bytes = bytes.fromhex(raw_bytes)
+            self.raw_bytes = base64.urlsafe_b64decode(raw_bytes)
         else:
             self.raw_bytes = raw_bytes
 
-    def hex(self) -> str:
-        return self.raw_bytes.hex()
+    def to_b64(self) -> str:
+        return base64.urlsafe_b64encode(self.raw_bytes).decode()
 
     def verify(self, sig: str, message: bytes) -> bool:
         pk = secp256k1.PublicKeyXOnly(self.raw_bytes)
-        return pk.verify(bytes.fromhex(sig), message)
+        return pk.verify(base64.urlsafe_b64decode(sig), message)
 
     @classmethod
-    def from_hex(cls, hex_: str, /) -> 'PublicKey':
-        return cls(bytes.fromhex(hex_))
+    def from_b64(cls, b64: str, /) -> 'PublicKey':
+        return cls(base64.urlsafe_b64decode(b64))
 
     def __repr__(self):
-        pubkey = self.hex()
+        pubkey = self.to_b64()
         return f'PublicKey({pubkey[:10]}...{pubkey[-10:]})'
 
     def __eq__(self, other):
@@ -48,11 +48,11 @@ class PublicKey:
         return hash(self.raw_bytes)
 
     def __str__(self):
-        """Return public key in hex form
+        """Return public key in b64 form
         :return: string
         :rtype: str
         """
-        return self.hex()
+        return self.to_b64()
 
     def __bytes__(self):
         """Return raw bytes
@@ -78,9 +78,9 @@ class PrivateKey:
         self.public_key = PublicKey(sk.public_key_xonly)
 
     @classmethod
-    def from_hex(cls, hex_: str, /):
-        """Load a PrivateKey from its hex form."""
-        return cls(bytes.fromhex(hex_))
+    def from_b64(cls, b64: str, /):
+        """Load a PrivateKey from its b64 form."""
+        return cls(base64.urlsafe_b64decode(b64))
 
     def __hash__(self):
         return hash(self.raw_secret)
@@ -88,23 +88,23 @@ class PrivateKey:
     def __eq__(self, other):
         return isinstance(other, PrivateKey) and self.raw_secret == other.raw_secret
 
-    def hex(self) -> str:
-        return self.raw_secret.hex()
+    def to_b64(self) -> str:
+        return base64.b64encode(self.raw_secret).decode()
 
     def sign(self, message: bytes, aux_randomness: bytes = b'') -> str:
         sk = secp256k1.PrivateKey(self.raw_secret)
-        return sk.sign_schnorr(message, aux_randomness).hex()
+        return base64.urlsafe_b64encode(sk.sign_schnorr(message, aux_randomness)).decode()
 
     def __repr__(self):
-        pubkey = self.public_key.hex()
+        pubkey = base64.urlsafe_b64encode(public_key).decode()
         return f'PrivateKey({pubkey[:10]}...{pubkey[-10:]})'
 
     def __str__(self):
-        """Return private key in hex form
-        :return: hex string
+        """Return private key in b64 form
+        :return: b64 string
         :rtype: str
         """
-        return self.hex()
+        return self.to_b64()
 
     def __bytes__(self):
         """Return raw bytes
@@ -120,9 +120,9 @@ def test_cp():
     assert pk == pk2
 
 
-def test_fromhex():
+def test_fromb64():
     pk = PrivateKey()
-    pk2 = PrivateKey.from_hex(pk.hex())
+    pk2 = PrivateKey.from_b64(pk.to_b64())
     assert pk == pk2
 
 
