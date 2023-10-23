@@ -66,9 +66,9 @@ class ConnectMessage(BaseModel):
     pubkey: str
     slug: str = ""
     sig: str = ""
-    ln_url: str     # sent for back compat.  will drop this eventually
+    ln_url: str  # sent for back compat.  will drop this eventually
     ln_address: str
-    auth_key: str   # user private auth token for queenbee
+    auth_key: str  # user private auth token for queenbee
     cpu_count: int
     disk_space: int
     vram: int
@@ -101,6 +101,7 @@ class Config(BaseSettings):
     config: str = Field(os.path.expanduser("~/.config/gputopia"), description="config file location")
     privkey: str = Field("", description=argparse.SUPPRESS, exclude=True)
 
+
 def get_free_space_mb(dirname):
     """Return folder/drive free space (in megabytes)."""
     if platform.system() == 'Windows':
@@ -115,6 +116,7 @@ def get_free_space_mb(dirname):
 
 class WorkerMain:
     def __init__(self, conf: Config):
+        self.conn: Optional[websockets.WebSocketClientProtocol] = None
         self.__connect_info: Optional[ConnectMessage] = None
         self.conf = conf
         self._gen_or_load_priv()
@@ -189,17 +191,7 @@ class WorkerMain:
             await self.test_model()
             return
 
-        async for websocket in websockets.connect(self.conf.queen_url):
-            if self.stopped:
-                break
-            try:
-                await self.run_ws(websocket)
-            except websockets.ConnectionClosed:
-                continue
-            except Exception:
-                log.exception("error in worker")
-            if self.stopped:
-                break
+        await self.run_ws()
 
     async def guess_layers(self, model_path):
         if self.conf.force_layers:
@@ -318,23 +310,47 @@ class WorkerMain:
         info = self.connect_info()
         return info.model_dump_json()
 
-    async def run_ws(self, ws: websockets.WebSocketCommonProtocol):
-        msg = self.connect_message()
-        log.info("connect queen: %s", msg)
-        await ws.send(msg)
+    async def ws_conn(self):
+        if not self.conn:
+            self.conn = await websockets.connect(self.conf.queen_url)
+            msg = self.connect_message()
+            log.info("connect queen: %s", msg)
+            await self.conn.send(msg)
 
+    async def ws_send(self, msg, retry=False):
+        while True:
+            await self.ws_conn()
+            try:
+                return await self.conn.send(msg)
+            except (websockets.ConnectionClosedError, websockets.ConnectionClosed) as ex:
+                self.conn = None
+                if retry:
+                    log.error("connection dropped, resending: %s", repr(ex))
+                    time.sleep(1)
+                else:
+                    raise
+
+    async def ws_recv(self):
+        await self.ws_conn()
+        try:
+            return await self.conn.recv()
+        except (websockets.ConnectionClosedError, websockets.ConnectionClosed):
+            self.conn = None
+            raise
+
+    async def run_ws(self):
         loops = 0
         while not self.stopped:
             try:
-                await self.run_one(ws)
+                await self.run_one()
             finally:
                 loops += 1
                 if self.conf.loops and loops == self.conf.loops:
                     await asyncio.sleep(1)
                     self.stopped = True
 
-    async def run_one(self, ws: websockets.WebSocketCommonProtocol):
-        req_str = await ws.recv()
+    async def run_one(self):
+        req_str = await self.ws_recv()
         try:
             req = Req.model_validate_json(req_str)
             model = req.openai_req.get("model")
@@ -344,23 +360,23 @@ class WorkerMain:
             st = time.monotonic()
             if req.openai_url == "/v1/fine_tuning/jobs":
                 async for event in self.fine_tuner.fine_tune(req.openai_req):
-                    await ws.send(json.dumps(event))
+                    await self.ws_send(json.dumps(event), True)
             elif req.openai_req.get("stream"):
                 await self.load_model(model)
                 async with aconnect_sse(self.llama_cli, "POST", req.openai_url, json=req.openai_req) as sse:
                     async for event in sse.aiter_sse():
                         if event.data != "[DONE]":
-                            await ws.send(event.data)
-                await ws.send("{}")
+                            await self.ws_send(event.data, True)
+                await self.ws_send("{}")
             else:
                 await self.load_model(model)
                 res: Response = await self.llama_cli.post(req.openai_url, json=req.openai_req)
-                await ws.send(res.text)
+                await self.ws_send(res.text)
             en = time.monotonic()
             log.info("done %s (%s secs)", model, en - st)
         except Exception as ex:
             log.exception("error running request: %s", req_str)
-            await ws.send(json.dumps({"error": str(ex), "error_type": type(ex).__name__}))
+            await self.ws_send(json.dumps({"error": str(ex), "error_type": type(ex).__name__}), True)
 
     async def get_model(self, name):
         return await self.download_model(name)
