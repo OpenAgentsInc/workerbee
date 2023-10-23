@@ -9,7 +9,7 @@ packages = [{include = "ai_worker"}, {include = "gguf_loader"}]
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.13"
-llama-cpp-python = {extras = ["server"], version = "0.2.7"}
+llama-cpp-python = {git = "https://github.com/abetlen/llama-cpp-python.git"}
 pydantic-settings = "^2.0.3"
 fastapi = "^0.103.1"
 websockets = "^11.0.3"
@@ -24,6 +24,7 @@ boto3 = "^1.28.45"
 itsdangerous = "^2.1.2"
 httpx-sse = "^0.3.1"
 pyopencl = "^2023.1.2"
+starlette-context = "^0.3.6"
 
 
 [tool.poetry.group.dev.dependencies]

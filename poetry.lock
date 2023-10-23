@@ -192,20 +192,6 @@ files = [
 ]
 
 [[package]]
-name = "click"
-version = "8.1.7"
-description = "Composable command line interface toolkit"
-optional = false
-python-versions = ">=3.7"
-files = [
-    {file = "click-8.1.7-py3-none-any.whl", hash = "sha256:ae74fb96c20a0277a1d615f1e4d73c8414f5a98db8b799a7931d1582f3390c28"},
-    {file = "click-8.1.7.tar.gz", hash = "sha256:ca9853ad459e787e2192211578cc907e7594e294c7ccc834310722b41b9ca6de"},
-]
-
-[package.dependencies]
-colorama = {version = "*", markers = "platform_system == \"Windows\""}
-
-[[package]]
 name = "colorama"
 version = "0.4.6"
 description = "Cross-platform colored terminal text."
@@ -469,30 +455,30 @@ files = [
 ]
 
 [[package]]
-name = "llama-cpp-python"
-version = "0.2.7"
+name = "llama_cpp_python"
+version = "0.2.11"
 description = "Python bindings for the llama.cpp library"
 optional = false
 python-versions = ">=3.8"
-files = [
-    {file = "llama_cpp_python-0.2.7.tar.gz", hash = "sha256:2267d3e90bf461ee581dc78332007ea15d9b40e79471850455458b399e3f1887"},
-]
+files = []
+develop = false
 
 [package.dependencies]
 diskcache = ">=5.6.1"
-fastapi = {version = ">=0.100.0", optional = true, markers = "extra == \"server\""}
 numpy = ">=1.20.0"
-pydantic-settings = {version = ">=2.0.1", optional = true, markers = "extra == \"server\""}
-sse-starlette = {version = ">=1.6.1", optional = true, markers = "extra == \"server\""}
-starlette-context = {version = ">=0.3.6,<0.4", optional = true, markers = "extra == \"server\""}
 typing-extensions = ">=4.5.0"
-uvicorn = {version = ">=0.22.0", optional = true, markers = "extra == \"server\""}
 
 [package.extras]
 all = ["llama_cpp_python[dev,server,test]"]
 dev = ["black (>=23.3.0)", "httpx (>=0.24.1)", "mkdocs (>=1.4.3)", "mkdocs-material (>=9.1.18)", "mkdocstrings[python] (>=0.22.0)", "pytest (>=7.4.0)", "twine (>=4.0.2)"]
 server = ["fastapi (>=0.100.0)", "pydantic-settings (>=2.0.1)", "sse-starlette (>=1.6.1)", "starlette-context (>=0.3.6,<0.4)", "uvicorn (>=0.22.0)"]
 test = ["httpx (>=0.24.1)", "pytest (>=7.4.0)"]
+
+[package.source]
+type = "git"
+url = "https://github.com/abetlen/llama-cpp-python.git"
+reference = "HEAD"
+resolved_reference = "acf50f179aba7d1964ff5471ad5ecfd620d461cf"
 
 [[package]]
 name = "macholib"
@@ -1200,20 +1186,6 @@ files = [
 ]
 
 [[package]]
-name = "sse-starlette"
-version = "1.6.5"
-description = "\"SSE plugin for Starlette\""
-optional = false
-python-versions = ">=3.8"
-files = [
-    {file = "sse-starlette-1.6.5.tar.gz", hash = "sha256:819f2c421fb37067380fe3dcaba246c476b02651b7bb7601099a378ad802a0ac"},
-    {file = "sse_starlette-1.6.5-py3-none-any.whl", hash = "sha256:68b6b7eb49be0c72a2af80a055994c13afcaa4761b29226beb208f954c25a642"},
-]
-
-[package.dependencies]
-starlette = "*"
-
-[[package]]
 name = "starlette"
 version = "0.27.0"
 description = "The little ASGI library that shines."
@@ -1315,25 +1287,6 @@ socks = ["pysocks (>=1.5.6,!=1.5.7,<2.0)"]
 zstd = ["zstandard (>=0.18.0)"]
 
 [[package]]
-name = "uvicorn"
-version = "0.23.2"
-description = "The lightning-fast ASGI server."
-optional = false
-python-versions = ">=3.8"
-files = [
-    {file = "uvicorn-0.23.2-py3-none-any.whl", hash = "sha256:1f9be6558f01239d4fdf22ef8126c39cb1ad0addf76c40e760549d2c2f43ab53"},
-    {file = "uvicorn-0.23.2.tar.gz", hash = "sha256:4d3cc12d7727ba72b64d12d3cc7743124074c0a69f7b201512fc50c3e3f1569a"},
-]
-
-[package.dependencies]
-click = ">=7.0"
-h11 = ">=0.8"
-typing-extensions = {version = ">=4.0", markers = "python_version < \"3.11\""}
-
-[package.extras]
-standard = ["colorama (>=0.4)", "httptools (>=0.5.0)", "python-dotenv (>=0.13)", "pyyaml (>=5.1)", "uvloop (>=0.14.0,!=0.15.0,!=0.15.1)", "watchfiles (>=0.13)", "websockets (>=10.4)"]
-
-[[package]]
 name = "websockets"
 version = "11.0.3"
 description = "An implementation of the WebSocket Protocol (RFC 6455 & 7692)"
@@ -1415,4 +1368,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.13"
-content-hash = "4a772b4ceb147d63b80a26776ea49d42a5a7ed8fde130247c5e3ee428931373a"
+content-hash = "dcd5653766d0acffbb667097f6d49a0ae90081275a6a205ebee63cc9ecb92375"
