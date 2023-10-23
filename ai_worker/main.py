@@ -9,7 +9,7 @@ import os
 import platform
 import sys
 import time
-from hashlib import sha256
+from hashlib import sha256, md5
 from pprint import pprint
 from typing import Optional, List
 from base64 import urlsafe_b64encode as b64encode, urlsafe_b64decode as b64decode
@@ -57,6 +57,7 @@ class GpuInfo(BaseModel):
 class ConnectMessage(BaseModel):
     worker_version: str
     pubkey: str
+    slug: str = ""
     sig: str = ""
     ln_url: str     # sent for back compat.  will drop this eventually
     ln_address: str
@@ -109,6 +110,10 @@ class WorkerMain:
         self._gen_or_load_priv()
         self.__sk = PrivateKey(b64decode(self.conf.privkey))
         self.pubkey = self.__sk.public_key.to_b64()
+        if self.conf.main_gpu or self.conf.tensor_split:
+            self.slug = b64encode(md5((str(self.conf.main_gpu) + self.conf.tensor_split).encode()).digest()).decode()
+        else:
+            self.slug = ""
         self.stopped = False
         self.llama = None
         self.llama_model = None
@@ -236,6 +241,7 @@ class WorkerMain:
         connect_msg = ConnectMessage(
             worker_version=VERSION,
             pubkey=self.pubkey,
+            slug=self.slug,
             ln_url=self.conf.ln_address,        # todo: remove eventually
             ln_address=self.conf.ln_address,
             auth_key=self.conf.auth_key,
