@@ -3,10 +3,12 @@ import json
 import re
 import time
 from threading import Thread
-from typing import Any, Optional
+from typing import Any
 
 import pytest
 import websockets
+
+from ai_worker.key import PublicKey
 from ai_worker.main import WorkerMain, Config, main as worker_main
 from gguf_loader.main import download_gguf, main as loader_main, get_size
 
@@ -62,10 +64,19 @@ def test_queen():
     ret[1].stop()
 
 
-def test_conn_str():
-    wm = WorkerMain(Config())
+def test_conn_str(tmp_path):
+    wm = WorkerMain(Config(config=str(tmp_path / "tmp")))
     msg = wm.connect_message()
     js = json.loads(msg)
+
+    sig = js.pop("sig")
+    orig = json.dumps(js, ensure_ascii=False, sort_keys=True)
+
+    pub = PublicKey.from_b64(wm.pubkey)
+    pub.verify(sig, orig.encode())
+
+    wm2 = WorkerMain(Config(config=str(tmp_path / "tmp")))
+    assert wm2.conf.privkey == wm.conf.privkey
 
     try:
         inst = nvidia_smi.getInstance()
@@ -79,6 +90,13 @@ def test_conn_str():
 
     assert js["cpu_count"]
     assert js["vram"]
+
+
+def test_conn_slug():
+    wm = WorkerMain(Config(main_gpu=2))
+    assert wm.slug
+    msg = wm.connect_message()
+    assert json.loads(msg)["slug"]
 
 
 async def test_wm():
@@ -128,7 +146,24 @@ def test_version(capsys):
 def test_main(capsys):
     try:
         worker_main(["--version"])
+        assert False, "should exit on --version call"
     except SystemExit:
         pass
     oe = capsys.readouterr().out
     re.match(r"\d+\.\d+\.\d+", oe)
+
+
+def test_cfg(capsys, tmp_path):
+    with open(tmp_path / "tmp", "w") as fh:
+        json.dump(dict(debug=True, test_model="TheBloke/CodeLlama-7B-Instruct-GGUF:Q4_K_M", test_max_tokens=1),
+                  fh)
+    worker_main(["--config", str(tmp_path / "tmp")])
+
+    oe = capsys.readouterr().out
+
+    # log shows pubkey and total_tokens because debug and test_models are set
+    assert re.search(r"pubkey", oe)
+    assert re.search(r"total_tokens", oe)
+
+    # privkey never logged!
+    assert not re.search(r"privkey", oe)
