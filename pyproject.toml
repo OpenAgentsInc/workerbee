@@ -24,13 +24,16 @@ boto3 = "^1.28.45"
 itsdangerous = "^2.1.2"
 httpx-sse = "^0.3.1"
 pyopencl = "^2023.1.2"
+coincurve = "^18.0.0"
+
+[tool.poetry.group.torch]
+optional = true
 
 [tool.poetry.group.torch.dependencies]
 bitsandbytes = "^0.41.1"
 torch = "2.1.0"
 datasets = "^2.14.5"
 scipy = "^1.11.3"
-coincurve = "^18.0.0"
 transformers = "^4.34.0"
 accelerate = "^0.23.0"
 peft = "^0.5.0"

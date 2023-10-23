@@ -9,6 +9,12 @@ if [ -z "$cmake" -o -z "$gpu" ]; then
     exit 1
 fi
 
+with_torch=""
+if [ "$gpu" == "cuda-torch" ]; then
+    with_torch="--with torch"
+fi
+
+
 set -o xtrace
 
 python -mvenv "build-$gpu"
@@ -22,7 +28,7 @@ pip uninstall -y llama-cpp-python
 rm -f ~/AppData/Local/pypoetry/Cache/artifacts/*/*/*/*/llama*
 rm -f ~/.cache/pypoetry/artifacts/*/*/*/*/llama*
 
-CMAKE_ARGS="$cmake" FORCE_CMAKE=1 poetry install
+CMAKE_ARGS="$cmake" FORCE_CMAKE=1 poetry install $with_torch
 
 python build-version.py
 

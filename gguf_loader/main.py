@@ -35,6 +35,8 @@ def convert_to_gguf(file):
 
 def get_size(name):
     typ, hf, fil = pick_file(name)
+    if not fil:
+        assert False, "not sizaable: %s" % name
     return fil["size"]
 
 
