@@ -72,7 +72,7 @@ def test_conn_str(tmp_path):
     sig = js.pop("sig")
     orig = json.dumps(js, ensure_ascii=False, sort_keys=True)
 
-    pub = PublicKey.from_hex(wm.pubkey)
+    pub = PublicKey.from_b64(wm.pubkey)
     pub.verify(sig, orig.encode())
 
     wm2 = WorkerMain(Config(config=str(tmp_path / "tmp")))
@@ -90,6 +90,13 @@ def test_conn_str(tmp_path):
 
     assert js["cpu_count"]
     assert js["vram"]
+
+
+def test_conn_slug():
+    wm = WorkerMain(Config(main_gpu=2))
+    assert wm.slug
+    msg = wm.connect_message()
+    assert json.loads(msg)["slug"]
 
 
 async def test_wm():
