@@ -23,6 +23,7 @@ async def test_dl(ft):
     assert os.path.getsize(fil) == 782
 
 
+@pytest.mark.cuda
 async def test_peft_unload_save_and_gguf(ft):
     base_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
     args = {}
@@ -66,6 +67,7 @@ async def test_peft_unload_save_and_gguf(ft):
     assert got["gguf"]
 
 
+@pytest.mark.cuda
 async def test_e2e(ft):
     job = {
         "model": "mistralai/Mistral-7B-Instruct-v0.1",
