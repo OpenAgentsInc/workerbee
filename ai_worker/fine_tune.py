@@ -1,5 +1,4 @@
 import gc
-import base64
 import hashlib
 import json
 import asyncio
@@ -295,7 +294,7 @@ class FineTuner:
                 dat = fil.read(100000)
                 if not dat:
                     break;
-                res = {"status": "lora", "chunk": str(base64.b64encode(dat))}
+                res = {"status": "lora", "chunk": b64enc(dat)}
                 cb(res)
       
         log.info("merge weights")
@@ -333,17 +332,17 @@ class FineTuner:
         gg = tmp + "/ggml-model-f16.gguf"
         with open(gg, "rb") as fil:
             while True:
-                dat = fil.read(100000)
+                dat = fil.read(1024*100)        # 100k chunks
                 if not dat:
                     break;
-                res = {"status": "gguf", "chunk": str(base64.b64encode(dat))}
+                res = {"status": "gguf", "chunk": b64enc(dat)}
                 cb(res)
         
-        shutil.rmtree(tmp)
-        
-        res = {"status": "done"}
         log.info("done train")
-        cb(res)
+        
+        cb({"status": "done"})
+        
+        shutil.rmtree(tmp)
 
     async def download_file(self, training_url: str) -> str:
         output_file = self.temp_file(hashlib.md5(training_url.encode()).hexdigest())

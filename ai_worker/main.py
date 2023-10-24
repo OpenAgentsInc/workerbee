@@ -312,23 +312,18 @@ class WorkerMain:
 
     async def ws_conn(self):
         if not self.conn:
-            self.conn = await websockets.connect(self.conf.queen_url)
+            self.conn = await websockets.connect(self.conf.queen_url, ping_interval=10, ping_timeout=90)
             msg = self.connect_message()
             log.info("connect queen: %s", msg)
             await self.conn.send(msg)
 
     async def ws_send(self, msg, retry=False):
-        while True:
-            await self.ws_conn()
-            try:
-                return await self.conn.send(msg)
-            except (websockets.ConnectionClosedError, websockets.ConnectionClosed) as ex:
-                self.conn = None
-                if retry:
-                    log.error("connection dropped, resending: %s", repr(ex))
-                    time.sleep(1)
-                else:
-                    raise
+        await self.ws_conn()
+        try:
+            return await self.conn.send(msg)
+        except (websockets.ConnectionClosedError, websockets.ConnectionClosed):
+            self.conn = None
+            raise
 
     async def ws_recv(self):
         await self.ws_conn()
@@ -351,6 +346,7 @@ class WorkerMain:
 
     async def run_one(self):
         req_str = await self.ws_recv()
+        event = None
         try:
             req = Req.model_validate_json(req_str)
             model = req.openai_req.get("model")
@@ -361,6 +357,7 @@ class WorkerMain:
             if req.openai_url == "/v1/fine_tuning/jobs":
                 async for event in self.fine_tuner.fine_tune(req.openai_req):
                     await self.ws_send(json.dumps(event), True)
+                await self.ws_send("{}")
             elif req.openai_req.get("stream"):
                 await self.load_model(model)
                 async with aconnect_sse(self.llama_cli, "POST", req.openai_url, json=req.openai_req) as sse:
@@ -374,6 +371,10 @@ class WorkerMain:
                 await self.ws_send(res.text)
             en = time.monotonic()
             log.info("done %s (%s secs)", model, en - st)
+        except (websockets.ConnectionClosedError, websockets.ConnectionClosed):
+            log.error("disconnected while running request: %s", req_str)
+            if event:
+                log.error("was sending event: %s", event)
         except Exception as ex:
             log.exception("error running request: %s", req_str)
             await self.ws_send(json.dumps({"error": str(ex), "error_type": type(ex).__name__}), True)

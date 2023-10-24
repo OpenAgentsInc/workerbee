@@ -89,7 +89,7 @@ class PrivateKey:
         return isinstance(other, PrivateKey) and self.raw_secret == other.raw_secret
 
     def to_b64(self) -> str:
-        return base64.b64encode(self.raw_secret).decode()
+        return base64.urlsafe_b64encode(self.raw_secret).decode()
 
     def sign(self, message: bytes, aux_randomness: bytes = b'') -> str:
         sk = secp256k1.PrivateKey(self.raw_secret)
