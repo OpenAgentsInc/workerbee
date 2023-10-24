@@ -291,7 +291,7 @@ class FineTuner:
         gz = gzip(tmp)
         with open(gz, "rb") as fil:
             while True:
-                dat = fil.read(100000)
+                dat = fil.read(1024*64)
                 if not dat:
                     break
                 res = {"status": "lora", "chunk": b64enc(dat)}
@@ -332,7 +332,7 @@ class FineTuner:
         gg = tmp + "/ggml-model-f16.gguf"
         with open(gg, "rb") as fil:
             while True:
-                dat = fil.read(1024*100)        # 100k chunks
+                dat = fil.read(1024*64)        # 64k chunks
                 if not dat:
                     break
                 res = {"status": "gguf", "chunk": b64enc(dat)}
