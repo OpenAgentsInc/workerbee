@@ -216,7 +216,6 @@ class GGUFReader:
         return None
 
     def value_size(self):
-        num_size = 32
         kvd = self.kv_data
         if qv:= kvd.get("general.quantization_version"):
             return GGML_SIZE_MAP.get(qv, 16)

@@ -284,11 +284,11 @@ class WorkerMain:
             log.debug("no nvidia: %s", ex)
 
         try:
-            for platform in pyopencl.get_platforms():
-                if "nvidia" in platform.name.lower():
+            for platf in pyopencl.get_platforms():
+                if "nvidia" in platf.name.lower():
                     continue
-                connect_msg.cl_driver_version = platform.version
-                for device in platform.get_devices():
+                connect_msg.cl_driver_version = platf.version
+                for device in platf.get_devices():
                     inf = GpuInfo(
                         name=device.name,
                         memory=int(device.global_mem_size / 1000000),
@@ -436,10 +436,10 @@ For example:
         arg_names.append(name)
         parser.add_argument(f"--{name}", **args)
 
-    parser.add_argument(f"--version", action="store_true")
+    parser.add_argument("--version", action="store_true")
 
     # todo: back compat.   remove eventually
-    parser.add_argument(f"--ln_url", type=str, help=argparse.SUPPRESS)
+    parser.add_argument("--ln_url", type=str, help=argparse.SUPPRESS)
 
     args = parser.parse_args(args=argv)
 

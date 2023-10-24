@@ -12,13 +12,13 @@ import shutil
 import transformers
 from datasets import load_dataset
 from httpx import AsyncClient, Response
-
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, TrainerCallback 
 from peft import prepare_model_for_kbit_training, PeftModel, LoraConfig, get_peft_model
 from accelerate import FullyShardedDataParallelPlugin, Accelerator
 from torch.distributed.fsdp.fully_sharded_data_parallel import FullOptimStateDictConfig, FullStateDictConfig
 
+from ai_worker.util import b64enc
 from gguf_loader.convert import main as gguf_main
 
 MAX_CONTEXT = 300000
@@ -293,7 +293,7 @@ class FineTuner:
             while True:
                 dat = fil.read(100000)
                 if not dat:
-                    break;
+                    break
                 res = {"status": "lora", "chunk": b64enc(dat)}
                 cb(res)
       
@@ -334,7 +334,7 @@ class FineTuner:
             while True:
                 dat = fil.read(1024*100)        # 100k chunks
                 if not dat:
-                    break;
+                    break
                 res = {"status": "gguf", "chunk": b64enc(dat)}
                 cb(res)
         
