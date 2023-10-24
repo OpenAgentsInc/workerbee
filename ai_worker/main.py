@@ -28,7 +28,8 @@ from dotenv import load_dotenv
 
 try:
     from .fine_tune import FineTuner
-except ImportError:
+except ImportError as ex:
+    log.error("failed import, disabling fine tune: %s", repr(ex))
     FineTuner = None
 
 from gguf_loader.main import get_size
