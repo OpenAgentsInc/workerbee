@@ -111,7 +111,7 @@ class FineTuner:
         log.info("DONE")
         t.join()
 
-        shutil.rmtree(training_file)
+        shutil.rmtree(training_file, ignore_errors=True)
 
     def _fine_tune(self, job, cb):
         try:
@@ -276,9 +276,11 @@ class FineTuner:
         tmp = self.temp_file(run_name, wipe=True)
         tokenizer.save_pretrained(tmp)
 
-        self.return_final(run_name, model, base_model_id, cb)
-        
-        shutil.rmtree(output_dir)
+
+        try:
+            self.return_final(run_name, model, base_model_id, cb)
+        finally: 
+            shutil.rmtree(output_dir)
 
     def return_final(self, run_name, model, base_model_id, cb):
         log.info("return final")
