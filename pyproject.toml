@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ai-worker"
-version = "0.1.10"
+version = "0.1.9"
 description = "api server that posts capabilities, and accepts jobs"
 authors = ["erik aronesty <erik@q32.com>"]
 license = "MIT"
@@ -20,16 +20,18 @@ sentencepiece = "^0.1.99"
 python-dotenv = "^1.0.0"
 pynvml = "^11.5.0"
 gguf = "^0.3.2"
+boto3 = "^1.28.45"
 itsdangerous = "^2.1.2"
 httpx-sse = "^0.3.1"
 pyopencl = "^2023.1.2"
-coincurve = "^18.0.0"
+leptonai = "^0.11.0"
 
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
 pytest-asyncio = "^0.21.1"
 pyinstaller = "^5.13.2"
+boto3 = "^1.28.43"
 ruff = "^0.0.288"
 toml = "^0.10.2"
 
