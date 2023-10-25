@@ -332,7 +332,7 @@ class FineTuner:
         gg = tmp + "/ggml-model-f16.gguf"
         with open(gg, "rb") as fil:
             while True:
-                dat = fil.read(1024*64)        # 64k chunks
+                dat = fil.read(1024*16)        # 16k chunks
                 if not dat:
                     break
                 res = {"status": "gguf", "chunk": b64enc(dat)}
