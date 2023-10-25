@@ -48,18 +48,17 @@ async def test_peft_unload_save_and_gguf(ft):
     tokenizer.save_pretrained(ft.temp_file("test"))
 
     model = PeftModel.from_pretrained(
-            AutoModelForCausalLM.from_pretrained(base_model_id, quantization_config=bnb_config, local_files_only=True, device_map="auto"), "mistral-journal-finetune")
+            AutoModelForCausalLM.from_pretrained(base_model_id, quantization_config=bnb_config, device_map="auto"), "mistral-journal-finetune")
     
     got = {}
     def cb(state):
-        if state.pop("lora_chunk", None):
-            got["lora"] += 1
-        if state.pop("gguf_chunk", None):
-            got["gguf"] += 1
+        res.pop("chunk", None)
+        got[state.get("status")] += 1
+        log.info("test-result: %s", res)
     
     log.info("call rf")
 
-    ft.return_final("test", model, base_model_id, cb)
+    ft.return_final("test", model, base_model_id, cb, {})
 
     log.debug(got)
 
@@ -69,20 +68,17 @@ async def test_peft_unload_save_and_gguf(ft):
 
 @pytest.mark.cuda
 async def test_e2e(ft):
+    base_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
     job = {
-        "model": "mistralai/Mistral-7B-Instruct-v0.1",
+        "model": base_model_id,
         "training_file": "https://gputopia-user-bucket.s3.amazonaws.com/bypass/file_782",
     }
     fin = []
     got = {}
     async for res in ft.fine_tune(job):
-        if res.pop("chunk", None):
-            if res.get("lora"):
-                got["lora"] += 1
-            elif res.get("gguf"):
-                got["gguf"] += 1
-        else:
-            log.info("test-result: %s", res)
+        res.pop("chunk", None)
+        got[state.get("status")] += 1
+        log.info("test-result: %s", res)
         fin.append(res)
 
     log.debug(got)

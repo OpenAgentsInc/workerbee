@@ -18,6 +18,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import prepare_model_for_kbit_training, PeftModel, LoraConfig, get_peft_model
 from accelerate import FullyShardedDataParallelPlugin, Accelerator
 from torch.distributed.fsdp.fully_sharded_data_parallel import FullOptimStateDictConfig, FullStateDictConfig
+from ai_worker.util import quantize_gguf
 
 from ai_worker.util import b64enc
 from gguf_loader.convert import main as gguf_main
@@ -116,9 +117,8 @@ class FineTuner:
             yield res
 
         log.info("done async wrapper")
+        
         t.join()
-
-        await asyncio.sleep(2)
 
         shutil.rmtree(training_file, ignore_errors=True)
 
@@ -152,12 +152,17 @@ class FineTuner:
         log.info("load model")
         cb({"status": "load_model"})
 
-        args.update(dict(
-            load_in_4bit=True,
-            bnb_4bit_use_double_quant=True,
-            bnb_4bit_quant_type="nf4",
-            bnb_4bit_compute_dtype=torch.bfloat16
-        ))
+        if hp.get("load_in_8bit"):
+            args.update(dict(
+                load_in_8bit=True,
+            ))
+        else:
+            args.update(dict(
+                load_in_4bit=True,
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_compute_dtype=torch.bfloat16
+            ))
 
         bnb_config = BitsAndBytesConfig(**args)
 
@@ -288,11 +293,11 @@ class FineTuner:
 
 
         try:
-            self.return_final(run_name, model, base_model_id, cb)
+            self.return_final(run_name, model, base_model_id, hp, cb)
         finally: 
             shutil.rmtree(output_dir, ignore_errors=True)
 
-    def return_final(self, run_name, model, base_model_id, cb):
+    def return_final(self, run_name, model, base_model_id, hp, cb):
         log.info("return final")
 
         tmp = self.temp_file(run_name)
@@ -322,6 +327,7 @@ class FineTuner:
         
         gc.collect()
         
+        os.unlink(gz)
         shutil.rmtree(tmp)
 
         tokenizer = AutoTokenizer.from_pretrained(
@@ -337,11 +343,16 @@ class FineTuner:
         
         # convert to gguf for fast inference
         log.info("ggml convert")
-        
+       
         gguf_main([tmp])
         
         gg = tmp + "/ggml-model-f16.gguf"
-        with open(gg, "rb") as fil:
+        
+        log.info("re-quantize")
+        q_level = hp.get("q_level", "q5_1")
+        gq = quantize_gguf(gg, q_level)
+
+        with open(gq, "rb") as fil:
             while True:
                 dat = fil.read(1024*64)        # 16k chunks
                 if not dat:
