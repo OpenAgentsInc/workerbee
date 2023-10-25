@@ -350,7 +350,7 @@ class FineTuner:
         
         log.info("re-quantize")
         q_level = hp.get("q_level", "q5_1")
-        if level == "f16":
+        if q_level == "f16":
             gq = gg
         else:
             cb({"status": "quantize", "level" : q_level})
