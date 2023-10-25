@@ -99,16 +99,25 @@ class FineTuner:
        
         loop = asyncio.get_running_loop()
 
+        log.info("spawn thread")
+
         t = threading.Thread(target=lambda: self._fine_tune(job, lambda res: loop.call_soon_threadsafe(q.put_nowait, res)), daemon=True)
         
         t.start()
         while True:
             res = await q.get()
+            
             if res is None:
+                log.info("break none")
                 break
+            
             yield res
-        log.info("DONE")
+
+        log.info("done outer loop")
         t.join()
+        log.info("done await thread")
+
+        await asyncio.sleep(2)
 
         shutil.rmtree(training_file, ignore_errors=True)
 
@@ -119,6 +128,8 @@ class FineTuner:
             log.exception("error in fine tune")
             cb({"status": "error", "detail": repr(ex)})
         finally:
+            log.info("cb push none")
+            cb(None)
             cb(None)
 
     def _unsafe_fine_tune(self, job, cb):
@@ -279,7 +290,7 @@ class FineTuner:
         try:
             self.return_final(run_name, model, base_model_id, cb)
         finally: 
-            shutil.rmtree(output_dir)
+            shutil.rmtree(output_dir, ignore_errors=True)
 
     def return_final(self, run_name, model, base_model_id, cb):
         log.info("return final")
@@ -332,17 +343,17 @@ class FineTuner:
         gg = tmp + "/ggml-model-f16.gguf"
         with open(gg, "rb") as fil:
             while True:
-                dat = fil.read(1024*16)        # 16k chunks
+                dat = fil.read(1024*64)        # 16k chunks
                 if not dat:
                     break
                 res = {"status": "gguf", "chunk": b64enc(dat)}
                 cb(res)
         
-        log.info("done train")
-        
         cb({"status": "done"})
         
-        shutil.rmtree(tmp)
+        shutil.rmtree(tmp, ignore_errors=True)
+        
+        log.info("done train")
 
     async def download_file(self, training_url: str) -> str:
         output_file = self.temp_file(hashlib.md5(training_url.encode()).hexdigest())

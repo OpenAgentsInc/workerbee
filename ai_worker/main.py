@@ -313,7 +313,7 @@ class WorkerMain:
 
     async def ws_conn(self):
         if not self.conn:
-            self.conn = await websockets.connect(self.conf.queen_url, ping_interval=10, ping_timeout=90)
+            self.conn = await websockets.connect(self.conf.queen_url, ping_interval=10, ping_timeout=120)
             msg = self.connect_message()
             log.info("connect queen: %s", msg)
             await self.conn.send(msg)
