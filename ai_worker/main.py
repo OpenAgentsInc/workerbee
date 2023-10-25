@@ -25,6 +25,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pynvml.smi import nvidia_smi
 import pyopencl
 from dotenv import load_dotenv
+import hashlib
 
 try:
     from .fine_tune import FineTuner
@@ -389,7 +390,7 @@ class WorkerMain:
         if not os.path.exists(output_file):
             with open(output_file + ".tmp", "wb") as fh:
                 async with AsyncClient() as cli:
-                    res: Response = await cli.get(url)
+                    res: Response = await cli.stream("GET", url)
                     async for chunk in res.aiter_bytes():
                         fh.write(chunk)
             os.replace(output_file + ".tmp", output_file)
@@ -400,7 +401,7 @@ class WorkerMain:
         user_prefix = "user:"
         
         if name.startswith(user_prefix):
-            sub = name[user_prefix:]
+            sub = name[len(user_prefix):]
             if not sub.endswith(".gguf"):
                 sub = sub + ".gguf"
             name = f"https://gputopia-user-bucket.s3.amazonaws.com/{sub}"

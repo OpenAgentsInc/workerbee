@@ -375,7 +375,7 @@ class FineTuner:
         if not os.path.exists(output_file):
             with open(output_file + ".tmp", "wb") as fh:
                 async with AsyncClient() as cli:
-                    res: Response = await cli.get(training_url)
+                    res: Response = await cli.stream("GET", training_url)
                     async for chunk in res.aiter_bytes():
                         fh.write(chunk)
             os.replace(output_file + ".tmp", output_file)
