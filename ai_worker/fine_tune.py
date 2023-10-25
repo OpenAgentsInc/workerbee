@@ -350,7 +350,11 @@ class FineTuner:
         
         log.info("re-quantize")
         q_level = hp.get("q_level", "q5_1")
-        gq = quantize_gguf(gg, q_level)
+        if level == "f16":
+            gq = gg
+        else:
+            cb({"status": "quantize", "level" : q_level})
+            gq = quantize_gguf(gg, q_level)
 
         with open(gq, "rb") as fil:
             while True:

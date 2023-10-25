@@ -383,8 +383,31 @@ class WorkerMain:
     async def get_model(self, name):
         return await self.download_model(name)
 
+    async def download_file(self, url: str) -> str:
+        name = hashlib.md5(url.encode()).hexdigest()
+        output_file = os.path.join(self.conf.tmp_dir, name)
+        if not os.path.exists(output_file):
+            with open(output_file + ".tmp", "wb") as fh:
+                async with AsyncClient() as cli:
+                    res: Response = await cli.get(url)
+                    async for chunk in res.aiter_bytes():
+                        fh.write(chunk)
+            os.replace(output_file + ".tmp", output_file)
+        return output_file
+
     async def download_model(self, name):
         # uses hf cache, so no need to handle here
+        user_prefix = "user:"
+        
+        if name.startswith(user_prefix):
+            sub = name[user_prefix:]
+            if not sub.endswith(".gguf"):
+                sub = sub + ".gguf"
+            name = f"https://gputopia-user-bucket.s3.amazonaws.com/{sub}"
+
+        if name.startswith("https:"):
+            return await self.download_file(name)
+ 
         from gguf_loader.main import download_gguf
         size = get_size(name)
         await self.free_up_space(size)
