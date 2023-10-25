@@ -9,6 +9,7 @@ import random
 import tarfile
 import shutil
 
+
 import transformers
 from datasets import load_dataset
 from httpx import AsyncClient, Response
@@ -95,27 +96,27 @@ class FineTuner:
         training_file = await self.download_file(training_url)
         job["training_file"] = training_file
 
-        q = asyncio.Queue()
-       
+
+        # 100 chunks is still pretty big (6mb), so that's enough
+        q = asyncio.Queue(100)
+
         loop = asyncio.get_running_loop()
 
         log.info("spawn thread")
 
-        t = threading.Thread(target=lambda: self._fine_tune(job, lambda res: loop.call_soon_threadsafe(q.put_nowait, res)), daemon=True)
+        # todo: write a test that checks mem usage when transmitting large files, this is easy to mess up
+        # important to wait here (result) or else the aio stack grows unbounded, even if te queue is bounded!
+        t = threading.Thread(target=lambda: self._fine_tune(job, lambda res: asyncio.run_coroutine_threadsafe(q.put(res), loop).result()), daemon=True)
         
         t.start()
         while True:
             res = await q.get()
-            
             if res is None:
-                log.info("break none")
                 break
-            
             yield res
 
-        log.info("done outer loop")
+        log.info("done async wrapper")
         t.join()
-        log.info("done await thread")
 
         await asyncio.sleep(2)
 
@@ -128,8 +129,7 @@ class FineTuner:
             log.exception("error in fine tune")
             cb({"status": "error", "detail": repr(ex)})
         finally:
-            log.info("cb push none")
-            cb(None)
+            log.info("done in thread")
             cb(None)
 
     def _unsafe_fine_tune(self, job, cb):
