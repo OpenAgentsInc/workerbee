@@ -25,7 +25,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pynvml.smi import nvidia_smi
 import pyopencl
 from dotenv import load_dotenv
-import hashlib
+
+from .util import user_ft_name_to_url, url_to_tempfile, USER_PREFIX
 
 log = logging.getLogger(__name__)
 
@@ -326,7 +327,7 @@ class WorkerMain:
         await self.ws_conn()
         try:
             return await self.conn.send(msg)
-        except (websockets.ConnectionClosedError, websockets.ConnectionClosed):
+        except (websockets.ConnectionClosedError, websockets.ConnectionClosed, websockets.exceptions.ConnectionClosedError):
             self.conn = None
             raise
 
@@ -334,7 +335,7 @@ class WorkerMain:
         await self.ws_conn()
         try:
             return await self.conn.recv()
-        except (websockets.ConnectionClosedError, websockets.ConnectionClosed):
+        except (websockets.ConnectionClosedError, websockets.ConnectionClosed, websockets.exceptions.ConnectionClosedError):
             self.conn = None
             raise
 
@@ -376,20 +377,23 @@ class WorkerMain:
                 await self.ws_send(res.text)
             en = time.monotonic()
             log.info("done %s (%s secs)", model, en - st)
-        except (websockets.ConnectionClosedError, websockets.ConnectionClosed):
+        except (websockets.ConnectionClosedError, websockets.ConnectionClosed, websockets.exceptions.ConnectionClosedError):
             log.error("disconnected while running request: %s", req_str)
             if event:
                 log.error("was sending event: %s", event)
         except Exception as ex:
             log.exception("error running request: %s", req_str)
-            await self.ws_send(json.dumps({"error": str(ex), "error_type": type(ex).__name__}), True)
+            try:
+                if self.conn:
+                    await self.ws_send(json.dumps({"error": str(ex), "error_type": type(ex).__name__}), True)
+            except Exception as ex:
+                log.exception("error reporting error: %s", str(ex))
 
     async def get_model(self, name):
         return await self.download_model(name)
 
     async def download_file(self, url: str) -> str:
-        name = hashlib.md5(url.encode()).hexdigest()
-        output_file = os.path.join(self.conf.tmp_dir, name)
+        output_file = url_to_tempfile(self.conf, url)
         if not os.path.exists(output_file):
             with open(output_file + ".tmp", "wb") as fh:
                 async with AsyncClient() as cli:
@@ -398,21 +402,20 @@ class WorkerMain:
                         async for chunk in res.aiter_bytes():
                             fh.write(chunk)
             os.replace(output_file + ".tmp", output_file)
+        self.note_have(url)
         return output_file
+
+    def note_have(self, url: str):  # noqa
+        log.info("todo: save loaded models list somewhere neutral, so we can support url as well as hf")
 
     async def download_model(self, name):
         # uses hf cache, so no need to handle here
-        user_prefix = "user:"
-        
-        if name.startswith(user_prefix):
-            sub = name[len(user_prefix):]
-            if not sub.endswith(".gguf"):
-                sub = sub + ".gguf"
-            name = f"https://gputopia-user-bucket.s3.amazonaws.com/{sub}"
+        if name.startswith(USER_PREFIX):
+            name = user_ft_name_to_url(name)
 
         if name.startswith("https:"):
             return await self.download_file(name)
- 
+
         from gguf_loader.main import download_gguf
         size = get_size(name)
         await self.free_up_space(size)

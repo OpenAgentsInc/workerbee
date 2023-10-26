@@ -9,16 +9,15 @@ import random
 import tarfile
 import shutil
 
-
 import transformers
 from datasets import load_dataset
 from httpx import AsyncClient, Response
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, TrainerCallback 
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, TrainerCallback
 from peft import prepare_model_for_kbit_training, PeftModel, LoraConfig, get_peft_model
 from accelerate import FullyShardedDataParallelPlugin, Accelerator
 from torch.distributed.fsdp.fully_sharded_data_parallel import FullOptimStateDictConfig, FullStateDictConfig
-from ai_worker.util import quantize_gguf
+from ai_worker.util import quantize_gguf, url_to_tempfile, user_ft_name_to_url
 
 from ai_worker.util import b64enc
 from gguf_loader.convert import main as gguf_main
@@ -27,12 +26,14 @@ MAX_CONTEXT = 300000
 
 log = logging.getLogger(__name__)
 
+
 def gzip(folder):
     """tar gz the folder to 'folder.tar.gz', removes the folder"""
     base_folder_name = os.path.basename(folder)
     with tarfile.open(f"{folder}.tar.gz", 'w:gz') as archive:
         archive.add(folder, arcname=base_folder_name)
     return f"{folder}.tar.gz"
+
 
 class FineTuner:
     def __init__(self, conf):
@@ -49,18 +50,18 @@ class FineTuner:
         # toss our role for now, for some reason it didn't work
         # todo: check for role support in template
         j = json.loads(ln)
-        
+
         if pr := j.get("prompt"):
             # todo: use templates properly to massage data for instruct vs chat
             j = json.loads(ln)
             cm = j["completion"]
-            j = {"messages": [{"role":"user","content":pr},{"role":"assistant","content":cm}]}
-        
+            j = {"messages": [{"role": "user", "content": pr}, {"role": "assistant", "content": cm}]}
+
         if "mistral" in job["model"].lower():
             j = json.loads(ln)
             j["messages"] = [m for m in j["messages"] if m["role"] != "system"]
             ln = json.dumps(j) + "\n"
-        
+
         return ln
 
     def massage_fine_tune(self, file, job):
@@ -97,7 +98,6 @@ class FineTuner:
         training_file = await self.download_file(training_url)
         job["training_file"] = training_file
 
-
         # 100 chunks is still pretty big (6mb), so that's enough
         q = asyncio.Queue(100)
 
@@ -107,8 +107,11 @@ class FineTuner:
 
         # todo: write a test that checks mem usage when transmitting large files, this is easy to mess up
         # important to wait here (result) or else the aio stack grows unbounded, even if te queue is bounded!
-        t = threading.Thread(target=lambda: self._fine_tune(job, lambda res: asyncio.run_coroutine_threadsafe(q.put(res), loop).result()), daemon=True)
-        
+        t = threading.Thread(target=lambda: self._fine_tune(job,
+                                                            lambda res: asyncio.run_coroutine_threadsafe(q.put(res),
+                                                                                                         loop).result()),
+                             daemon=True)
+
         t.start()
         while True:
             res = await q.get()
@@ -117,7 +120,7 @@ class FineTuner:
             yield res
 
         log.info("done async wrapper")
-        
+
         shutil.rmtree(training_file, ignore_errors=True)
 
     def _fine_tune(self, job, cb):
@@ -177,6 +180,7 @@ class FineTuner:
         tokenizer.pad_token = tokenizer.eos_token
         # todo: derive from model params
         max_length = hp.get("pad_length", 512)
+
         def generate_and_tokenize_prompt(prompt):
             # all input is openai formatted, and we clean it up above if needed
             pr = prompt["messages"]
@@ -193,7 +197,8 @@ class FineTuner:
         tokenized_train_dataset = train_dataset.map(generate_and_tokenize_prompt)
         tokenized_val_dataset = eval_dataset.map(generate_and_tokenize_prompt)
 
-        model = AutoModelForCausalLM.from_pretrained(base_model_id, quantization_config=bnb_config, device_map="auto", resume_download=True)
+        model = AutoModelForCausalLM.from_pretrained(base_model_id, quantization_config=bnb_config, device_map="auto",
+                                                     resume_download=True)
 
         model.gradient_checkpointing_enable()
         model = prepare_model_for_kbit_training(model)
@@ -251,7 +256,6 @@ class FineTuner:
                 log.info(f"checkpoint {checkpoint_dir}")
                 cb({"status": "checkpoint"})
 
-
         trainer = transformers.Trainer(
             model=model,
             train_dataset=tokenized_train_dataset,
@@ -263,7 +267,7 @@ class FineTuner:
                 per_device_train_batch_size=hp.get("batch_size", 2),
                 gradient_accumulation_steps=hp.get("accumulation_steps", 4),
                 max_steps=hp.get("max_steps", -1),
-                num_train_epochs=hp.get("n_epochs", 3), # use openai terminology here
+                num_train_epochs=hp.get("n_epochs", 3),  # use openai terminology here
                 learning_rate=hp.get("learning_rate_multiplier", 2.5e-5),  # Want a small lr for finetuning
                 bf16=True,
                 optim="paged_adamw_8bit",
@@ -283,23 +287,23 @@ class FineTuner:
         log.info("start train")
         cb({"status": "start_train"})
         model.config.use_cache = False  # silence the warnings
-        
+
         trainer.train()
 
         tmp = self.temp_file(run_name, wipe=True)
         tokenizer.save_pretrained(tmp)
 
-
         try:
-            self.return_final(run_name, model, base_model_id, hp, cb)
-        finally: 
+            self.return_final(run_name, model, base_model_id, job, cb)
+        finally:
             shutil.rmtree(output_dir, ignore_errors=True)
 
-    def return_final(self, run_name, model, base_model_id, hp, cb):
+    def return_final(self, run_name, model, base_model_id, job, cb):
         log.info("return final")
 
+        hp = job.get("hyperparameters", {})
         tmp = self.temp_file(run_name)
-        
+
         # send up lora
         model.save_pretrained(tmp, safe_serialization=True)
         gz = gzip(tmp)
@@ -307,27 +311,29 @@ class FineTuner:
         tot_size = os.path.getsize(gz)
         with open(gz, "rb") as fil:
             while True:
-                dat = fil.read(1024*64)
+                dat = fil.read(1024 * 64)
                 if not dat:
                     break
                 cur_size += len(dat)
-                res = {"status": "lora", "chunk": b64enc(dat), "pct": cur_size/tot_size}
+                res = {"status": "lora", "chunk": b64enc(dat), "pct": cur_size / tot_size}
                 cb(res)
-      
+
         log.info("merge weights")
 
         # merge weights
-        
+
         # reload as float16 for merge
         del model
         gc.collect()
 
         # reload with f16
-        model = PeftModel.from_pretrained(AutoModelForCausalLM.from_pretrained(base_model_id, torch_dtype=torch.float16, local_files_only=True, device_map="auto"), tmp)
+        model = PeftModel.from_pretrained(
+            AutoModelForCausalLM.from_pretrained(base_model_id, torch_dtype=torch.float16, local_files_only=True,
+                                                 device_map="auto"), tmp)
         model = model.merge_and_unload()
-        
+
         gc.collect()
-        
+
         os.unlink(gz)
         shutil.rmtree(tmp)
 
@@ -339,43 +345,54 @@ class FineTuner:
         )
         tokenizer.pad_token = tokenizer.eos_token
         tokenizer.save_pretrained(tmp)
- 
+
         model.save_pretrained(tmp)
-        
+
         # convert to gguf for fast inference
         log.info("ggml convert")
-       
+
         gguf_main([tmp])
-        
+
         gg = tmp + "/ggml-model-f16.gguf"
-        
+
         log.info("re-quantize")
         q_level = hp.get("q_level", "q6_k")
         if q_level.lower() in ("f16", "q16"):
             gq = gg
         else:
-            cb({"status": "quantize", "level" : q_level})
+            cb({"status": "quantize", "level": q_level})
             gq = quantize_gguf(gg, q_level)
 
         cur_size = 0
         tot_size = os.path.getsize(gq)
         with open(gq, "rb") as fil:
             while True:
-                dat = fil.read(1024*64)        # 16k chunks
+                dat = fil.read(1024 * 64)  # 16k chunks
                 if not dat:
                     break
                 cur_size += len(dat)
-                res = {"status": "gguf", "chunk": b64enc(dat), "pct": cur_size/tot_size}
+                res = {"status": "gguf", "chunk": b64enc(dat), "pct": cur_size / tot_size}
                 cb(res)
-        
+
+        # keep a local copy for inference
+        final_name = job.get("final_name")
+        ft_url = user_ft_name_to_url(final_name)
+        output_file = url_to_tempfile(self.conf, ft_url)
+        os.replace(gq, output_file)
+
+        self.note_have(ft_url)
+
         cb({"status": "done"})
-        
+
         shutil.rmtree(tmp, ignore_errors=True)
-        
+
         log.info("done train")
 
+    def note_have(self, url: str):  # noqa
+        log.info("todo: save loaded models list somewhere neutral, so we can support url as well as hf")
+
     async def download_file(self, training_url: str) -> str:
-        output_file = self.temp_file(hashlib.md5(training_url.encode()).hexdigest())
+        output_file = url_to_tempfile(self.conf, training_url)
         if not os.path.exists(output_file):
             with open(output_file + ".tmp", "wb") as fh:
                 async with AsyncClient() as cli:
@@ -384,4 +401,5 @@ class FineTuner:
                         async for chunk in res.aiter_bytes():
                             fh.write(chunk)
             os.replace(output_file + ".tmp", output_file)
+        self.note_have(training_url)
         return output_file

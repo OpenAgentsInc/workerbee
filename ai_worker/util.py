@@ -1,4 +1,7 @@
 import base64
+import hashlib
+import os
+
 import llama_cpp
 
 GGML_TYPE_MAP = {
@@ -20,6 +23,8 @@ GGML_TYPE_MAP = {
 
 GGML_INVERSE_MAP={v.lower():k for k, v in GGML_TYPE_MAP.items()}
 
+USER_PREFIX = "user:"
+
 def b64enc(byt):
     return base64.urlsafe_b64encode(byt).decode()
 
@@ -39,3 +44,20 @@ def quantize_gguf(fil, level):
     if return_code != 0:
         raise RuntimeError("Failed to quantize model")
     return out
+
+
+def user_ft_name_to_url(name):
+    if name.startswith(USER_PREFIX):
+        sub = name[len(USER_PREFIX):]
+    else:
+        sub = name
+    if not sub.endswith(".gguf"):
+        sub = sub + ".gguf"
+    name = f"https://gputopia-user-bucket.s3.amazonaws.com/{sub}"
+    return name
+
+
+def url_to_tempfile(conf, url):
+    name = hashlib.md5(url.encode()).hexdigest()
+    output_file = os.path.join(conf.tmp_dir, name)
+    return output_file
