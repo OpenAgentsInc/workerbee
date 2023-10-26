@@ -302,11 +302,11 @@ class FineTuner:
 
         tmp = self.temp_file(run_name)
         
-        tot_size = os.path.getsize(gq)
-        cur_size = 0
         # send up lora
         model.save_pretrained(tmp, safe_serialization=True)
         gz = gzip(tmp)
+        cur_size = 0
+        tot_size = os.path.getsize(gz)
         with open(gz, "rb") as fil:
             while True:
                 dat = fil.read(1024*64)
@@ -359,8 +359,8 @@ class FineTuner:
             cb({"status": "quantize", "level" : q_level})
             gq = quantize_gguf(gg, q_level)
 
-        tot_size = os.path.getsize(gq)
         cur_size = 0
+        tot_size = os.path.getsize(gq)
         with open(gq, "rb") as fil:
             while True:
                 dat = fil.read(1024*64)        # 16k chunks
