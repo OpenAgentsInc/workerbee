@@ -402,11 +402,11 @@ class WorkerMain:
                         async for chunk in res.aiter_bytes():
                             fh.write(chunk)
             os.replace(output_file + ".tmp", output_file)
-        self.note_have(url)
+            self.note_have(url)
         return output_file
 
     def note_have(self, url: str):  # noqa
-        log.info("todo: save loaded models list somewhere neutral, so we can support url as well as hf")
+        pass # todo: save loaded models list somewhere neutral, so we can support url as well as hf
 
     async def download_model(self, name):
         # uses hf cache, so no need to handle here
