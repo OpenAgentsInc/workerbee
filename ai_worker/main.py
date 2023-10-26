@@ -32,7 +32,8 @@ log = logging.getLogger(__name__)
 try:
     from .fine_tune import FineTuner
 except ImportError as ex:
-    log.error("failed import, disabling fine tune: %s", repr(ex))
+    if os.environ.get("GPUTOPIA_DEBUG_IMPORT"):
+        log.exception("fine tuning not enabled")
     FineTuner = None
 
 from gguf_loader.main import get_size
@@ -134,6 +135,8 @@ class WorkerMain:
         self.llama_cli: Optional[AsyncClient] = None
         if FineTuner:
             self.fine_tuner = FineTuner(self.conf)
+        else:
+            self.fine_tuner = None
 
     def _gen_or_load_priv(self) -> None:
         if not self.conf.privkey:
