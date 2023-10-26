@@ -3,6 +3,7 @@
 gpu="$1"
 arch="$2"
 cmake="$3"
+opts="--onefile"
 
 if [ -z "$cmake" -o -z "$gpu" ]; then
     echo usage build-bin.sh gpu arch "cmake-args"
@@ -12,6 +13,7 @@ fi
 with_torch=""
 if [ "$gpu" == "cuda-torch" ]; then
     with_torch="--with torch"
+    opts=""
 fi
 
 
@@ -32,6 +34,6 @@ CMAKE_ARGS="$cmake" FORCE_CMAKE=1 poetry install $with_torch
 
 python build-version.py
 
-./pyinstaller.sh $gpu-$arch
+./pyinstaller.sh $gpu-$arch $opts
 
 deactivate
