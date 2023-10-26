@@ -27,6 +27,8 @@ import pyopencl
 from dotenv import load_dotenv
 import hashlib
 
+log = logging.getLogger(__name__)
+
 try:
     from .fine_tune import FineTuner
 except ImportError as ex:
@@ -43,8 +45,6 @@ APP_NAME = "gputopia"
 ENV_PREFIX = APP_NAME.upper()
 
 DEFAULT_COORDINATOR = "wss://queenbee.gputopia.ai/worker"
-
-log = logging.getLogger(__name__)
 
 load_dotenv()
 
