@@ -118,8 +118,6 @@ class FineTuner:
 
         log.info("done async wrapper")
         
-        t.join()
-
         shutil.rmtree(training_file, ignore_errors=True)
 
     def _fine_tune(self, job, cb):
