@@ -352,7 +352,7 @@ class FineTuner:
         gg = tmp + "/ggml-model-f16.gguf"
         
         log.info("re-quantize")
-        q_level = hp.get("q_level", "q5_1")
+        q_level = hp.get("q_level", "q6_k")
         if q_level.lower() in ("f16", "q16"):
             gq = gg
         else:
