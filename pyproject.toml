@@ -70,6 +70,7 @@ ignore = ['E701', 'E501']
 
 [tool.poetry.scripts]
 gputopia_worker = 'ai_worker.main:main'
+quantize_gguf = 'ai_worker.quantize_main:main'
 
 [build-system]
 requires = ["poetry-core"]

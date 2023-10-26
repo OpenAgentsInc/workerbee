@@ -67,8 +67,11 @@ cmake --install . --prefix C:/CLBlast
 
 
 ### Run a dev-mode worker
-- `poetry shell`
 - `poetry run gputopia_worker`
+
+### Run a re-quantization on a gguf
+- `poetry run quantize_gguf`
+
 
 
 ### Run tests to be sure it really works

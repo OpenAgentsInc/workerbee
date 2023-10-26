@@ -152,7 +152,7 @@ class FineTuner:
         log.info("load model")
         cb({"status": "load_model"})
 
-        if hp.get("load_in_8bit"):
+        if hp.get("fine_tune_bits") == 8:
             args.update(dict(
                 load_in_8bit=True,
             ))
@@ -302,6 +302,8 @@ class FineTuner:
 
         tmp = self.temp_file(run_name)
         
+        tot_size = os.path.getsize(gq)
+        cur_size = 0
         # send up lora
         model.save_pretrained(tmp, safe_serialization=True)
         gz = gzip(tmp)
@@ -310,7 +312,8 @@ class FineTuner:
                 dat = fil.read(1024*64)
                 if not dat:
                     break
-                res = {"status": "lora", "chunk": b64enc(dat)}
+                cur_size += len(dat)
+                res = {"status": "lora", "chunk": b64enc(dat), "pct": cur_size/tot_size}
                 cb(res)
       
         log.info("merge weights")
@@ -350,18 +353,21 @@ class FineTuner:
         
         log.info("re-quantize")
         q_level = hp.get("q_level", "q5_1")
-        if q_level == "f16":
+        if q_level.lower() in ("f16", "q16"):
             gq = gg
         else:
             cb({"status": "quantize", "level" : q_level})
             gq = quantize_gguf(gg, q_level)
 
+        tot_size = os.path.getsize(gq)
+        cur_size = 0
         with open(gq, "rb") as fil:
             while True:
                 dat = fil.read(1024*64)        # 16k chunks
                 if not dat:
                     break
-                res = {"status": "gguf", "chunk": b64enc(dat)}
+                cur_size += len(dat)
+                res = {"status": "gguf", "chunk": b64enc(dat), "pct": cur_size/tot_size}
                 cb(res)
         
         cb({"status": "done"})
