@@ -149,6 +149,7 @@ class WorkerMain:
                 js = {}
             if not js.get("privkey"):
                 js["privkey"] = b64encode(os.urandom(32)).decode()
+                os.makedirs(os.path.dirname(cfg), exist_ok=True)
                 with open(cfg, "w", encoding="utf8") as fh:
                     json.dump(js, fh, indent=4)
             self.conf.privkey = js["privkey"]
