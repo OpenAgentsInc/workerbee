@@ -353,6 +353,7 @@ class WorkerMain:
 
     async def run_one(self):
         event = None
+        req_str = None
         try:
             req_str = await self.ws_recv()
             req = Req.model_validate_json(req_str)
