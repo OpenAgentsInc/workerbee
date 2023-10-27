@@ -36,4 +36,10 @@ python build-version.py
 
 ./pyinstaller.sh $gpu-$arch $opts
 
+if [ "$gpu" == "cuda-torch" ]; then
+    pushd dist
+    tar cvf - gputopia-worker-$gpu-$arch/ | pigz -9 - > gputopia-worker-$gpu-$arch.tar.gz
+    popd
+fi
+
 deactivate
