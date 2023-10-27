@@ -29,4 +29,4 @@ fi
 
 rm -rf bin
 aws s3 sync "s3://gputopia/bin/" bin/
-githubrelease release arcadelabsinc/workerbee create "$version" --publish --name "gputopia-worker-$version" "bin/*"
+githubrelease release arcadelabsinc/workerbee create "$version" --publish --name "gputopia-worker-$version" "bin/*[!z]"
