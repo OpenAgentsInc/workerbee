@@ -352,9 +352,9 @@ class WorkerMain:
                     self.stopped = True
 
     async def run_one(self):
-        req_str = await self.ws_recv()
         event = None
         try:
+            req_str = await self.ws_recv()
             req = Req.model_validate_json(req_str)
             model = req.openai_req.get("model")
 
