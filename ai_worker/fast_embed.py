@@ -48,7 +48,7 @@ class _FastEmbed:
                 embedding=nda.tolist(),
                 index=i
             )
-            for i, nda in enumerate(self.embedding_model.embed(docs))
+            for i, nda in enumerate(self.embedding_model.embed(docs, parallel=0))
         ]
 
         res["data"] = embed
@@ -59,8 +59,12 @@ class _FastEmbed:
 def FastEmbed(*a) -> Optional[_FastEmbed]:
     try:
         from fastembed.embedding import FlagEmbedding as Embedding
+        import onnxruntime as ort
+        if ort.get_device() != "GPU":
+            log.warning("fast embed not enabled, ort runtime does not see the GPU")
+            return None
         return _FastEmbed(Embedding, *a)
     except ImportError:
         if os.environ.get("GPUTOPIA_DEBUG_IMPORT"):
-            log.exception("fine tuning not enabled")
+            log.exception("fast embed not enabled")
         return None
