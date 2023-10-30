@@ -1,23 +1,23 @@
 import os
 import torch
-from transformers import AutoModelForCausalLM, BitsAndBytesConfig, AutoTokenizer
-from peft import PeftModel
 import pytest
 import tarfile
 import tempfile
 import logging as log
 
-from ai_worker.fine_tune import FineTuner
 from ai_worker.main import Config
-from ai_worker.fine_tune import gzip
+from ai_worker.util import gzip
+
 
 @pytest.fixture
 def ft():
     conf = Config()
+    from ai_worker.fine_tune import FineTuner
     ft = FineTuner(conf)
     yield ft
 
 
+@pytest.mark.cuda
 async def test_dl(ft):
     fil = await ft.download_file("https://gputopia-user-bucket.s3.amazonaws.com/bypass/file_782")
     assert os.path.getsize(fil) == 782
@@ -25,6 +25,8 @@ async def test_dl(ft):
 
 @pytest.mark.cuda
 async def test_peft_unload_save_and_gguf(ft):
+    from transformers import AutoModelForCausalLM, BitsAndBytesConfig, AutoTokenizer
+    from peft import PeftModel
     base_model_id = "mistralai/Mistral-7B-Instruct-v0.1"
     args = {}
     args.update(dict(
