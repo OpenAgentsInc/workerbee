@@ -37,6 +37,13 @@ except ImportError as ex:
         log.exception("fine tuning not enabled")
     FineTuner = None
 
+try:
+    from .fastembed import FastEmbed
+except ImportError as ex:
+    if os.environ.get("GPUTOPIA_DEBUG_IMPORT"):
+        log.exception("fast embedding not enabled")
+    FastEmbed = None
+
 from gguf_loader.main import get_size
 
 from .gguf_reader import GGUFReader
@@ -134,10 +141,17 @@ class WorkerMain:
         self.llama = None
         self.llama_model = None
         self.llama_cli: Optional[AsyncClient] = None
+        
         if FineTuner:
             self.fine_tuner = FineTuner(self.conf)
         else:
             self.fine_tuner = None
+
+        if FastEmbed:
+            self.fast_embed = FastEmbed(self.conf)
+        else:
+            self.fast_embed = None
+
 
     def _gen_or_load_priv(self) -> None:
         if not self.conf.privkey:
@@ -366,6 +380,9 @@ class WorkerMain:
                 async for event in self.fine_tuner.fine_tune(req.openai_req):
                     await self.ws_send(json.dumps(event), True)
                 await self.ws_send("{}")
+            elif req.openai_url == "/v1/embeddings" and model.startswith("onnx:"):
+                res = self.fast_embed.embed(req.openai_req)
+                self.ws_send(json.dumps(res), True)
             elif req.openai_req.get("stream"):
                 await self.load_model(model)
                 async with aconnect_sse(self.llama_cli, "POST", req.openai_url, json=req.openai_req) as sse:
