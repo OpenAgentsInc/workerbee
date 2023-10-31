@@ -17,8 +17,8 @@ class _FastEmbed:
     def embed(self, req: dict):
         model = req["model"]
 
-        if model.startswith(MODEL_PREFIX + ":"):
-            model = model[len(MODEL_PREFIX) + 1:]
+        if model.startswith(MODEL_PREFIX):
+            model = model[len(MODEL_PREFIX):]
 
         max_length = req.get("max_length", 512)
 
