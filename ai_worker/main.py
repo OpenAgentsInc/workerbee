@@ -26,9 +26,15 @@ from pynvml.smi import nvidia_smi
 import pyopencl
 from dotenv import load_dotenv
 
+from .util import user_ft_name_to_url, url_to_tempfile, USER_PREFIX
+
+log = logging.getLogger(__name__)
+
 try:
     from .fine_tune import FineTuner
-except ImportError:
+except ImportError as ex:
+    if os.environ.get("GPUTOPIA_DEBUG_IMPORT"):
+        log.exception("fine tuning not enabled")
     FineTuner = None
 
 from gguf_loader.main import get_size
@@ -41,8 +47,6 @@ APP_NAME = "gputopia"
 ENV_PREFIX = APP_NAME.upper()
 
 DEFAULT_COORDINATOR = "wss://queenbee.gputopia.ai/worker"
-
-log = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -66,9 +70,9 @@ class ConnectMessage(BaseModel):
     pubkey: str
     slug: str = ""
     sig: str = ""
-    ln_url: str     # sent for back compat.  will drop this eventually
+    ln_url: str  # sent for back compat.  will drop this eventually
     ln_address: str
-    auth_key: str   # user private auth token for queenbee
+    auth_key: str  # user private auth token for queenbee
     cpu_count: int
     disk_space: int
     vram: int
@@ -101,6 +105,7 @@ class Config(BaseSettings):
     config: str = Field(os.path.expanduser("~/.config/gputopia"), description="config file location")
     privkey: str = Field("", description=argparse.SUPPRESS, exclude=True)
 
+
 def get_free_space_mb(dirname):
     """Return folder/drive free space (in megabytes)."""
     if platform.system() == 'Windows':
@@ -115,6 +120,7 @@ def get_free_space_mb(dirname):
 
 class WorkerMain:
     def __init__(self, conf: Config):
+        self.conn: Optional[websockets.WebSocketClientProtocol] = None
         self.__connect_info: Optional[ConnectMessage] = None
         self.conf = conf
         self._gen_or_load_priv()
@@ -130,6 +136,8 @@ class WorkerMain:
         self.llama_cli: Optional[AsyncClient] = None
         if FineTuner:
             self.fine_tuner = FineTuner(self.conf)
+        else:
+            self.fine_tuner = None
 
     def _gen_or_load_priv(self) -> None:
         if not self.conf.privkey:
@@ -141,6 +149,7 @@ class WorkerMain:
                 js = {}
             if not js.get("privkey"):
                 js["privkey"] = b64encode(os.urandom(32)).decode()
+                os.makedirs(os.path.dirname(cfg), exist_ok=True)
                 with open(cfg, "w", encoding="utf8") as fh:
                     json.dump(js, fh, indent=4)
             self.conf.privkey = js["privkey"]
@@ -189,17 +198,7 @@ class WorkerMain:
             await self.test_model()
             return
 
-        async for websocket in websockets.connect(self.conf.queen_url):
-            if self.stopped:
-                break
-            try:
-                await self.run_ws(websocket)
-            except websockets.ConnectionClosed:
-                continue
-            except Exception:
-                log.exception("error in worker")
-            if self.stopped:
-                break
+        await self.run_ws()
 
     async def guess_layers(self, model_path):
         if self.conf.force_layers:
@@ -292,11 +291,11 @@ class WorkerMain:
             log.debug("no nvidia: %s", ex)
 
         try:
-            for platform in pyopencl.get_platforms():
-                if "nvidia" in platform.name.lower():
+            for platf in pyopencl.get_platforms():
+                if "nvidia" in platf.name.lower():
                     continue
-                connect_msg.cl_driver_version = platform.version
-                for device in platform.get_devices():
+                connect_msg.cl_driver_version = platf.version
+                for device in platf.get_devices():
                     inf = GpuInfo(
                         name=device.name,
                         memory=int(device.global_mem_size / 1000000),
@@ -318,24 +317,45 @@ class WorkerMain:
         info = self.connect_info()
         return info.model_dump_json()
 
-    async def run_ws(self, ws: websockets.WebSocketCommonProtocol):
-        msg = self.connect_message()
-        log.info("connect queen: %s", msg)
-        await ws.send(msg)
+    async def ws_conn(self):
+        if not self.conn:
+            self.conn = await websockets.connect(self.conf.queen_url, ping_interval=10, ping_timeout=120)
+            msg = self.connect_message()
+            log.info("connect queen: %s", msg)
+            await self.conn.send(msg)
 
+    async def ws_send(self, msg, retry=False):
+        await self.ws_conn()
+        try:
+            return await self.conn.send(msg)
+        except (websockets.ConnectionClosedError, websockets.ConnectionClosed, websockets.exceptions.ConnectionClosedError):
+            self.conn = None
+            raise
+
+    async def ws_recv(self):
+        await self.ws_conn()
+        try:
+            return await self.conn.recv()
+        except (websockets.ConnectionClosedError, websockets.ConnectionClosed, websockets.exceptions.ConnectionClosedError):
+            self.conn = None
+            raise
+
+    async def run_ws(self):
         loops = 0
         while not self.stopped:
             try:
-                await self.run_one(ws)
+                await self.run_one()
             finally:
                 loops += 1
                 if self.conf.loops and loops == self.conf.loops:
                     await asyncio.sleep(1)
                     self.stopped = True
 
-    async def run_one(self, ws: websockets.WebSocketCommonProtocol):
-        req_str = await ws.recv()
+    async def run_one(self):
+        event = None
+        req_str = None
         try:
+            req_str = await self.ws_recv()
             req = Req.model_validate_json(req_str)
             model = req.openai_req.get("model")
 
@@ -344,29 +364,60 @@ class WorkerMain:
             st = time.monotonic()
             if req.openai_url == "/v1/fine_tuning/jobs":
                 async for event in self.fine_tuner.fine_tune(req.openai_req):
-                    await ws.send(json.dumps(event))
+                    await self.ws_send(json.dumps(event), True)
+                await self.ws_send("{}")
             elif req.openai_req.get("stream"):
                 await self.load_model(model)
                 async with aconnect_sse(self.llama_cli, "POST", req.openai_url, json=req.openai_req) as sse:
                     async for event in sse.aiter_sse():
                         if event.data != "[DONE]":
-                            await ws.send(event.data)
-                await ws.send("{}")
+                            await self.ws_send(event.data, True)
+                await self.ws_send("{}")
             else:
                 await self.load_model(model)
                 res: Response = await self.llama_cli.post(req.openai_url, json=req.openai_req)
-                await ws.send(res.text)
+                await self.ws_send(res.text)
             en = time.monotonic()
             log.info("done %s (%s secs)", model, en - st)
+        except (websockets.ConnectionClosedError, websockets.ConnectionClosed, websockets.exceptions.ConnectionClosedError):
+            log.error("disconnected while running request: %s", req_str)
+            if event:
+                log.error("was sending event: %s", event)
         except Exception as ex:
             log.exception("error running request: %s", req_str)
-            await ws.send(json.dumps({"error": str(ex), "error_type": type(ex).__name__}))
+            try:
+                if self.conn:
+                    await self.ws_send(json.dumps({"error": str(ex), "error_type": type(ex).__name__}), True)
+            except Exception as ex:
+                log.exception("error reporting error: %s", str(ex))
 
     async def get_model(self, name):
         return await self.download_model(name)
 
+    async def download_file(self, url: str) -> str:
+        output_file = url_to_tempfile(self.conf, url)
+        if not os.path.exists(output_file):
+            with open(output_file + ".tmp", "wb") as fh:
+                async with AsyncClient() as cli:
+                    async with cli.stream("GET", url) as res:
+                        res: Response
+                        async for chunk in res.aiter_bytes():
+                            fh.write(chunk)
+            os.replace(output_file + ".tmp", output_file)
+            self.note_have(url)
+        return output_file
+
+    def note_have(self, url: str):  # noqa
+        pass # todo: save loaded models list somewhere neutral, so we can support url as well as hf
+
     async def download_model(self, name):
         # uses hf cache, so no need to handle here
+        if name.startswith(USER_PREFIX):
+            name = user_ft_name_to_url(name)
+
+        if name.startswith("https:"):
+            return await self.download_file(name)
+
         from gguf_loader.main import download_gguf
         size = get_size(name)
         await self.free_up_space(size)
@@ -419,10 +470,10 @@ For example:
         arg_names.append(name)
         parser.add_argument(f"--{name}", **args)
 
-    parser.add_argument(f"--version", action="store_true")
+    parser.add_argument("--version", action="store_true")
 
     # todo: back compat.   remove eventually
-    parser.add_argument(f"--ln_url", type=str, help=argparse.SUPPRESS)
+    parser.add_argument("--ln_url", type=str, help=argparse.SUPPRESS)
 
     args = parser.parse_args(args=argv)
 

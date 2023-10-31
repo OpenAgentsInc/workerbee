@@ -4,7 +4,6 @@ import sys
 
 from dotenv import load_dotenv
 import os
-import boto3
 
 from huggingface_hub import hf_hub_download, snapshot_download
 from huggingface_hub import HfFileSystem
@@ -115,45 +114,11 @@ load_dotenv()
 # Get AWS credentials from environment variables
 
 
-def upload_to_s3(path, dest):
-    # Split 'dest' into bucket and key (filename)
-    bucket_name, key = dest.split("/", 1)
-
-    aws_access_key_id = os.environ['AWS_ACCESS_KEY_ID']
-    aws_secret_access_key = os.environ['AWS_SECRET_ACCESS_KEY']
-    aws_region = os.getenv('AWS_REGION')
-
-    # Initialize a session using Amazon S3
-    s3 = boto3.client('s3',
-                      aws_access_key_id=aws_access_key_id,
-                      aws_secret_access_key=aws_secret_access_key,
-                      region_name=aws_region)
-
-    # Perform the upload
-    s3.upload_file(path, bucket_name, key)
-
-
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Download a specific gguf model from hf, suitable for llama_cpp")
-    parser.add_argument("--s3", help="upload to s3, must have .env with access key", action="store")
-    parser.add_argument("--s3-region", help="s3 region, or can read from AWS_REGION", action="store")
     parser.add_argument("model", help="hugging face model name and optional [:filter]")
     args = parser.parse_args(args=argv)
 
     path = download_gguf(args.model)
 
-    if args.s3:
-        s3 = args.s3
-        if args.s3_region:
-            os.environ["AWS_REGION"] = args.s3_region
-
-        if s3.endswith("/"):
-            # give it a nice name
-            s3 += args.model.replace("/", ".").replace(":", ".") + ".ggml"
-
-        # useful if you're caching these conversions and names centrally somewhere
-        upload_to_s3(path, s3)
-
-        print(s3)
-    else:
-        print(path)
+    print(path)

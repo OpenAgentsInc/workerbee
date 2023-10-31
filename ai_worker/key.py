@@ -1,6 +1,5 @@
 import base64
 import os
-from hashlib import sha256
 from typing import Optional, Union
 
 import coincurve as secp256k1
@@ -89,14 +88,14 @@ class PrivateKey:
         return isinstance(other, PrivateKey) and self.raw_secret == other.raw_secret
 
     def to_b64(self) -> str:
-        return base64.b64encode(self.raw_secret).decode()
+        return base64.urlsafe_b64encode(self.raw_secret).decode()
 
     def sign(self, message: bytes, aux_randomness: bytes = b'') -> str:
         sk = secp256k1.PrivateKey(self.raw_secret)
         return base64.urlsafe_b64encode(sk.sign_schnorr(message, aux_randomness)).decode()
 
     def __repr__(self):
-        pubkey = base64.urlsafe_b64encode(public_key).decode()
+        pubkey = base64.urlsafe_b64encode(self.public_key).decode()
         return f'PrivateKey({pubkey[:10]}...{pubkey[-10:]})'
 
     def __str__(self):

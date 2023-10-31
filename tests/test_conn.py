@@ -99,6 +99,7 @@ def test_conn_slug():
     assert json.loads(msg)["slug"]
 
 
+@pytest.mark.cuda
 async def test_wm():
     wm = WorkerMain(Config())
     await wm.load_model("TheBloke/WizardLM-7B-uncensored-GGML:q4_K_M")
@@ -112,6 +113,7 @@ async def test_wm():
     assert res
 
 
+@pytest.mark.cuda
 async def test_run(test_queen):
     queen_events.clear()
     wm = WorkerMain(Config(loops=1, queen_url=test_queen))
