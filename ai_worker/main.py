@@ -37,6 +37,12 @@ except ImportError as ex:
         log.exception("fine tuning not enabled")
     FineTuner = None
 
+try:
+    from ai_worker.sdxl import SDXL
+except ImportError as e:
+    log.error(f"Failed to import SDXL: {e}")
+    SDXL = None
+
 from gguf_loader.main import get_size
 
 from .gguf_reader import GGUFReader
@@ -105,6 +111,14 @@ class Config(BaseSettings):
     config: str = Field(os.path.expanduser("~/.config/gputopia"), description="config file location")
     privkey: str = Field("", description=argparse.SUPPRESS, exclude=True)
 
+class OpenAIRequest(BaseModel):
+    prompt: str
+    n: int
+    size: str
+
+class OpenAIResponse(BaseModel):
+    created: int
+    data: List[dict]
 
 def get_free_space_mb(dirname):
     """Return folder/drive free space (in megabytes)."""
@@ -138,6 +152,10 @@ class WorkerMain:
             self.fine_tuner = FineTuner(self.conf)
         else:
             self.fine_tuner = None
+        if SDXL:
+            self.sdxl = SDXL()
+        else:
+            self.sdxl = None
 
     def _gen_or_load_priv(self) -> None:
         if not self.conf.privkey:
@@ -366,6 +384,8 @@ class WorkerMain:
                 async for event in self.fine_tuner.fine_tune(req.openai_req):
                     await self.ws_send(json.dumps(event), True)
                 await self.ws_send("{}")
+            elif req.openai_url == "/v1/image_generation":
+                await self.handle_image_generation(req.openai_req)
             elif req.openai_req.get("stream"):
                 await self.load_model(model)
                 async with aconnect_sse(self.llama_cli, "POST", req.openai_url, json=req.openai_req) as sse:
@@ -391,6 +411,27 @@ class WorkerMain:
             except Exception as ex:
                 log.exception("error reporting error: %s", str(ex))
 
+    async def handle_image_generation(self, request_data):
+        request = OpenAIRequest(**request_data)
+        images = [await self.sdxl.run(prompt=request.prompt) for _ in range(request.n)]
+        image_urls = [self.save_image(image) for image in images]
+        
+        response_data = [{"url": image_url} for image_url in image_urls]
+        response = OpenAIResponse(
+            created=int(time.time()),
+            data=response_data
+        )
+
+        # Send the response back through your communication channel
+        await self.send_response(response.json())
+
+    def save_image(self, image):
+        # Save the image to a file and return the URL
+        filename = f"{int(time.time())}_{id(image)}.png"
+        image_path = Path("images") / filename
+        image.save(image_path)
+        return str(image_path)
+    
     async def get_model(self, name):
         return await self.download_model(name)
 
