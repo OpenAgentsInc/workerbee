@@ -61,6 +61,7 @@ pytest-asyncio = "^0.21.1"
 pyinstaller = "^5.13.2"
 ruff = "^0.0.288"
 toml = "^0.10.2"
+coverage = "^7.3.2"
 
 
 [tool.poetry.group.onnx.dependencies]
@@ -69,11 +70,11 @@ tqdm = "^4.66.1"
 onnxruntime-gpu = "^1.16.1"
 fastembed = "^0.1.1"
 
-[tool.poetry.group.amd-onnx.dependencies]
+[tool.poetry.group.dev-onnx.dependencies]
 onnx = "^1.15.0"
 tqdm = "^4.66.1"
-onnxruntime-directml = "^1.16.1"
 fastembed = "^0.1.1"
+onnxruntime = "^1.16.1"
 
 [tool.ruff]
 line-length = 120

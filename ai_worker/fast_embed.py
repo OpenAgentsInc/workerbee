@@ -60,7 +60,7 @@ def FastEmbed(*a) -> Optional[_FastEmbed]:
     try:
         from fastembed.embedding import FlagEmbedding as Embedding
         import onnxruntime as ort
-        if ort.get_device() != "GPU":
+        if ort.get_device() != "GPU" and not os.environ.get("CI"):
             log.warning("fast embed not enabled, ort runtime does not see the GPU")
             return None
         return _FastEmbed(Embedding, *a)
