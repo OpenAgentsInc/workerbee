@@ -69,6 +69,12 @@ tqdm = "^4.66.1"
 onnxruntime-gpu = "^1.16.1"
 fastembed = "^0.1.1"
 
+[tool.poetry.group.amd-onnx.dependencies]
+onnx = "^1.15.0"
+tqdm = "^4.66.1"
+onnxruntime-directml = "^1.16.1"
+fastembed = "^0.1.1"
+
 [tool.ruff]
 line-length = 120
 ignore = ['E701', 'E501']
