@@ -7,6 +7,10 @@ fi
 
 pushd dist
 for f in gputopia-worker-*; do
-    aws s3 cp $f s3://gputopia/bin/ --acl public-read
+    if [ -f "$f" ]; then
+        aws s3 cp $f s3://gputopia/bin/ --acl public-read
+    else
+        aws s3 sync $f s3://gputopia/bin/$f --acl public-read
+    fi    
 done
 popd
