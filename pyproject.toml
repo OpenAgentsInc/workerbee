@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "ai-worker"
-version = "0.2.3"
-description = "api server that posts capabilities, and accepts jobs"
+version = "0.3.0"
+description = "An ai worker that posts capabilities, and accepts jobs"
 authors = ["erik aronesty <erik@q32.com>"]
 license = "MIT"
 readme = "README.md"
