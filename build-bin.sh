@@ -12,7 +12,7 @@ fi
 
 with_torch=""
 if [ "$gpu" == "cuda-torch" ]; then
-    with_torch="--with torch"
+    with_torch="--with torch --with onnx"
     opts=""
 fi
 
