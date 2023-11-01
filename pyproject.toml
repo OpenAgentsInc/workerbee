@@ -64,11 +64,20 @@ toml = "^0.10.2"
 coverage = "^7.3.2"
 
 
+[tool.poetry.group.onnx]
+optional = true
+
+
 [tool.poetry.group.onnx.dependencies]
 onnx = "^1.15.0"
 tqdm = "^4.66.1"
 onnxruntime-gpu = "^1.16.1"
 fastembed = "^0.1.1"
+
+
+[tool.poetry.group.dev-onnx]
+optional = true
+
 
 [tool.poetry.group.dev-onnx.dependencies]
 onnx = "^1.15.0"
