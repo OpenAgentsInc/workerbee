@@ -32,7 +32,7 @@ log = logging.getLogger(__name__)
 
 try:
     from .fine_tune import FineTuner
-except ImportError as ex:
+except ImportError:
     if os.environ.get("GPUTOPIA_DEBUG_IMPORT"):
         log.exception("fine tuning not enabled")
     FineTuner = None

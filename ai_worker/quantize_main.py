@@ -2,8 +2,6 @@ import argparse
 
 from ai_worker.util import quantize_gguf, GGML_INVERSE_MAP
 
-import argparse
-
 # List of quantization levels
 quantization_levels = list(GGML_INVERSE_MAP.keys())
 

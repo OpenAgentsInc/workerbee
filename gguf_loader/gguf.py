@@ -10,7 +10,7 @@ import tempfile
 from enum import IntEnum, auto
 from io import BufferedWriter
 from pathlib import Path
-from typing import IO, Any, BinaryIO, Callable, Sequence
+from typing import Any, BinaryIO, Callable, Sequence
 
 import numpy as np
 

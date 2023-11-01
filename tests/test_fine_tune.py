@@ -54,9 +54,9 @@ async def test_peft_unload_save_and_gguf(ft):
     
     got = {}
     def cb(state):
-        res.pop("chunk", None)
+        state.pop("chunk", None)
         got[state.get("status")] += 1
-        log.info("test-result: %s", res)
+        log.info("test-result: %s", state)
     
     log.info("call rf")
 
@@ -79,7 +79,7 @@ async def test_e2e(ft):
     got = {}
     async for res in ft.fine_tune(job):
         res.pop("chunk", None)
-        got[state.get("status")] += 1
+        got[res.get("status")] += 1
         log.info("test-result: %s", res)
         fin.append(res)
 
