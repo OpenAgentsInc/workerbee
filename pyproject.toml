@@ -1,14 +1,14 @@
 [tool.poetry]
 name = "ai-worker"
-version = "0.2.3"
-description = "api server that posts capabilities, and accepts jobs"
+version = "0.3.0"
+description = "An ai worker that posts capabilities, and accepts jobs"
 authors = ["erik aronesty <erik@q32.com>"]
 license = "MIT"
 readme = "README.md"
 packages = [{include = "ai_worker"}, {include = "gguf_loader"}]
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.13"
+python = ">=3.10,<3.12"
 llama-cpp-python = {extras = ["server"], version = "0.2.7"}
 pydantic-settings = "^2.0.3"
 fastapi = "^0.103.1"
@@ -35,7 +35,7 @@ bitsandbytes = "^0.41.1"
 torch = ">=2.1.0"
 datasets = "^2.14.5"
 scipy = "^1.11.3"
-transformers = "^4.34.0"
+transformers = "*"
 accelerate = "^0.23.0"
 peft = "^0.5.0"
 cmake = "^3.27.7"
@@ -61,14 +61,36 @@ pytest-asyncio = "^0.21.1"
 pyinstaller = "^5.13.2"
 ruff = "^0.0.288"
 toml = "^0.10.2"
+coverage = "^7.3.2"
+
+
+[tool.poetry.group.onnx]
+optional = true
+
+
+[tool.poetry.group.onnx.dependencies]
+onnx = "^1.15.0"
+tqdm = "^4.66.1"
+onnxruntime-gpu = "^1.16.1"
+fastembed = "^0.1.1"
+
+
+[tool.poetry.group.dev-onnx]
+optional = true
+
+
+[tool.poetry.group.dev-onnx.dependencies]
+onnx = "^1.15.0"
+tqdm = "^4.66.1"
+fastembed = "^0.1.1"
+onnxruntime = "^1.16.1"
 
 [tool.ruff]
 line-length = 120
-ignore = ['E701', 'E501']
+ignore = ['E701', 'E501', 'E402']
 
 [tool.ruff.per-file-ignores]
 "__init__.py" = ['F401']
-"tests/*" = ['E402']
 
 [tool.poetry.scripts]
 gputopia_worker = 'ai_worker.main:main'

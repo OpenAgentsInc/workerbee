@@ -3,11 +3,9 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
-import copy
 import enum
 import faulthandler
 import functools
-import io
 import itertools
 import json
 import math
@@ -23,12 +21,11 @@ from abc import ABCMeta, abstractmethod
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
-from typing import IO, TYPE_CHECKING, Any, Callable, Generator, Iterable, Literal, Sequence, TypeVar
+from typing import IO, TYPE_CHECKING, Any, Callable, Iterable, Literal, TypeVar
 
 import numpy as np
 from sentencepiece import SentencePieceProcessor  # type: ignore[import]
 
-import os
 from . import gguf
 
 if TYPE_CHECKING:
@@ -335,7 +332,6 @@ class BpeVocab:
 
     def bpe_tokens(self) -> Iterable[tuple[bytes, float, gguf.TokenType]]:
         tokenizer = self.bpe_tokenizer
-        from transformers.models.gpt2 import tokenization_gpt2  # type: ignore[import]
         reverse_vocab = {id: encoded_tok for encoded_tok, id in tokenizer.items()}
 
         for i, _ in enumerate(tokenizer):
@@ -850,7 +846,7 @@ class OutputFile:
         elif isinstance(vocab, BpeVocab):
             self.gguf.add_tokenizer_model("gpt2")
         else:
-            raise ValueError(f'Unknown vocab type: Not BpeVocab or SentencePieceVocab')
+            raise ValueError('Unknown vocab type: Not BpeVocab or SentencePieceVocab')
         self.gguf.add_token_list(tokens)
         self.gguf.add_token_scores(scores)
         self.gguf.add_token_types(toktypes)

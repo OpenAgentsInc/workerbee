@@ -16,6 +16,10 @@ if [ "$gpu" == "cuda-torch" ]; then
     opts=""
 fi
 
+with_onnx=""
+if [ "$gpu" == "cuda" ]; then
+    with_torch="--with onnx"
+fi
 
 set -o xtrace
 
@@ -35,12 +39,5 @@ CMAKE_ARGS="$cmake" FORCE_CMAKE=1 poetry install $with_torch
 python build-version.py
 
 ./pyinstaller.sh $gpu-$arch $opts
-
-if [ "$gpu" == "cuda-torch" ]; then
-    pushd dist
-    tar cvf - gputopia-worker-$gpu-$arch/ | pigz -9 - > gputopia-worker-$gpu-$arch.tar.gz
-    rm -rf gputopia-worker-$gpu-$arch/
-    popd
-fi
 
 deactivate
