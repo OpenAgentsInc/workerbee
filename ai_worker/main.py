@@ -236,9 +236,12 @@ class WorkerMain:
         return max(0, est_layers - self.conf.layer_offset)
 
     async def load_model(self, name):
+        assert name, "No model name"
         if name == self.llama_model:
             return
+        
         log.debug("loading model: %s", name)
+        
         model_path = await self.get_model(name)
 
         if llama_cpp.server.app.llama:
@@ -252,6 +255,7 @@ class WorkerMain:
                                  embedding=True, cache=True, port=8181,
                                  main_gpu=self.conf.main_gpu, tensor_split=sp)
         self.llama = create_llama_app(settings)
+        assert self.llama, "Load llama failed.   Try lowering layers."
         self.llama_cli = AsyncClient(app=self.llama, base_url="http://test")
         self.llama_model = name
 
