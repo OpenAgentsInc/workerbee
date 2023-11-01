@@ -220,6 +220,10 @@ class WorkerMain:
 
         for gpu in info.nv_gpus:
             tot_mem += gpu.memory * 1000000
+        
+        if tot_mem == 0:
+            for gpu in info.cl_gpus:
+                tot_mem += gpu.memory * 1000000
 
         if est_ram > tot_mem:
             est_layers = tot_mem // (est_ram / layers)
