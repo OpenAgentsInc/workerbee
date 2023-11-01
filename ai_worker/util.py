@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import os
+import tarfile
 
 import llama_cpp
 
@@ -61,3 +62,11 @@ def url_to_tempfile(conf, url):
     name = hashlib.md5(url.encode()).hexdigest()
     output_file = os.path.join(conf.tmp_dir, name)
     return output_file
+
+
+def gzip(folder):
+    """tar gz the folder to 'folder.tar.gz', removes the folder"""
+    base_folder_name = os.path.basename(folder)
+    with tarfile.open(f"{folder}.tar.gz", 'w:gz') as archive:
+        archive.add(folder, arcname=base_folder_name)
+    return f"{folder}.tar.gz"

@@ -2,10 +2,11 @@ ai_worker/version.py
 
 # lib stuff
 CLBlast/
-build-cuda/
-build-opencl/
+build-*/
 bin/
 *.gguf
+local_cache/
+tests/local_cache/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
