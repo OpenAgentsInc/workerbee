@@ -22,14 +22,6 @@ class SDXL:
 
         self._refiner = None
 
-    @property
-    def refiner(self):
-        # This part may need to be updated if a compatible ONNX refiner model is available
-        if self._refiner is None:
-            # ... refiner loading code ...
-            pass
-        return self._refiner
-
     def run(
         self,
         prompt: str,
