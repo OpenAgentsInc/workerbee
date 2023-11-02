@@ -12,7 +12,7 @@ import tempfile
 import time
 from hashlib import sha256, md5
 from pprint import pprint
-from typing import Optional, List
+from typing import Optional, List, Literal, Any
 from base64 import urlsafe_b64encode as b64encode, urlsafe_b64decode as b64decode
 import psutil
 import websockets
@@ -26,7 +26,7 @@ from pynvml.smi import nvidia_smi
 import pyopencl
 from dotenv import load_dotenv
 
-from .util import user_ft_name_to_url, url_to_tempfile, USER_PREFIX
+from .util import user_ft_name_to_url, url_to_tempfile, USER_PREFIX, schedule_task
 
 log = logging.getLogger(__name__)
 
@@ -37,11 +37,7 @@ except ImportError:
         log.exception("fine tuning not enabled")
     FineTuner = None
 
-try:
-    from ai_worker.sdxl import SDXL
-except ImportError as e:
-    log.error(f"Failed to import SDXL: {e}")
-    SDXL = None
+from ai_worker.sdxl import SDXL
 
 from .fast_embed import FastEmbed, MODEL_PREFIX
 from gguf_loader.main import get_size
@@ -110,16 +106,27 @@ class Config(BaseSettings):
                          description="temp folder for data files and checkpoints")
 
     config: str = Field(os.path.expanduser("~/.config/gputopia"), description="config file location")
+    enable: list[Literal["sdxl"]] = Field([], description="List of optional models to enable")
     privkey: str = Field("", description=argparse.SUPPRESS, exclude=True)
 
-class OpenAIRequest(BaseModel):
+class ImageRequest(BaseModel):
     prompt: str
-    n: int
-    size: str
+    size: str = "1024x1024"
+    n: int = 1
+    hyperparameters: dict[str, Any] = {}
 
-class OpenAIResponse(BaseModel):
+
+class ImageData(BaseModel):
+    object: str
+    index: int
+    data: str
+
+
+class ImageResponse(BaseModel):
     created: int
-    data: List[dict]
+    object: str
+    data: List[ImageData]
+
 
 def get_free_space_mb(dirname):
     """Return folder/drive free space (in megabytes)."""
@@ -154,10 +161,7 @@ class WorkerMain:
             self.fine_tuner = FineTuner(self.conf)
         else:
             self.fine_tuner = None
-        if SDXL:
-            self.sdxl = SDXL(self.conf)
-        else:
-            self.sdxl = None
+        self.sdxl = SDXL(self.conf)
         self.fast_embed = FastEmbed(self.conf)
         
     def _gen_or_load_priv(self) -> None:
@@ -218,6 +222,10 @@ class WorkerMain:
         if self.conf.test_model:
             await self.test_model()
             return
+
+        # in the background, download the model
+        if self.sdxl:
+            schedule_task(self.sdxl.preload())
 
         await self.run_ws()
 
@@ -287,6 +295,9 @@ class WorkerMain:
 
         if self.fast_embed:
             caps += ["fast-embed"]
+        
+        if self.sdxl:
+            caps += ["sdxl"]
 
         connect_msg = ConnectMessage(
             worker_version=VERSION,
@@ -429,26 +440,10 @@ class WorkerMain:
                 log.exception("error reporting error: %s", str(ex))
 
     async def handle_image_generation(self, request_data):
-        request = OpenAIRequest(**request_data)
-        images = [await self.sdxl.run(prompt=request.prompt) for _ in range(request.n)]
-        image_urls = [self.save_image(image) for image in images]
-        
-        response_data = [{"url": image_url} for image_url in image_urls]
-        response = OpenAIResponse(
-            created=int(time.time()),
-            data=response_data
-        )
+        res = await self.sdxl.handle_request(request_data)
+        ImageResponse.model_validatate(res)
+        await self.send_response(res)
 
-        # Send the response back through your communication channel
-        await self.send_response(response.json())
-
-    def save_image(self, image):
-        # Save the image to a file and return the URL
-        filename = f"{int(time.time())}_{id(image)}.png"
-        image_path = Path("images") / filename
-        image.save(image_path)
-        return str(image_path)
-    
     async def get_model(self, name):
         return await self.download_model(name)
 
@@ -525,6 +520,8 @@ For example:
             args["default"] = field.default
         if field.annotation is bool:
             args.pop("type")
+        if name == "enable":
+            continue
         arg_names.append(name)
         parser.add_argument(f"--{name}", **args)
 
@@ -532,6 +529,10 @@ For example:
 
     # todo: back compat.   remove eventually
     parser.add_argument("--ln_url", type=str, help=argparse.SUPPRESS)
+    
+
+    # too annoying to deal with Listeral list
+    parser.add_argument("--enable", choices=["sdxl"], nargs="+")
 
     args = parser.parse_args(args=argv)
 

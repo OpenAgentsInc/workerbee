@@ -1,6 +1,6 @@
 import importlib
 import sys
-
+import logging as log
 import pytest
 import json
 from unittest.mock import MagicMock
@@ -11,7 +11,7 @@ from ai_worker.sdxl import SDXL
 
 @pytest.fixture
 def sdxl_onnx():
-    conf = Config()
+    conf = Config(enable=["sdxl"])
     yield SDXL(conf)
 
 
@@ -24,11 +24,13 @@ def sdxl_mocked(monkeypatch):
     import ai_worker.sdxl
     importlib.reload(ai_worker.sdxl)
 
-    conf = Config()
+    conf = Config(enable=["sdxl"])
+    
     ret = SDXL(conf)
     ret.base = MagicMock()
     ret.base.return_value = MagicMock()
     ret.base.return_value.images = [MagicMock()]
+    ret.model = "stabilityai/stable-diffusion-xl-base-1.0" 
 
     yield ret
 
@@ -44,8 +46,9 @@ def sdxl_inst(request):
 
 
 async def test_imagegen_simple(sdxl_inst: "SDXL"):
-    req = {"prompt": "a dog", "n": 1, "size": "1024x1024"}
+    req = {"prompt": "a dog", "n": 1, "size": "1024x1024", "hyperparameters": {"steps": 4}}
     result = await sdxl_inst.handle_req(req)
+    log.debug(result)
     assert result["object"] == "list"
     assert result["data"][0]["object"] == "image"
     assert result["data"][0]["index"] == 0

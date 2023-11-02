@@ -1,41 +1,62 @@
 import os
-from hashlib import md5
+import typing
+import base64
+import time
+import asyncio
 
-from PIL import Image
-from optimum.onnxruntime import ORTStableDiffusionXLPipeline
+from io import BytesIO
+from hashlib import md5
+from typing import Optional
+import logging as log
+
 from ai_worker.util import gunzip, download_file, url_to_tempfile
 
-class SDXL:
-    def __init__(self, conf):
+if typing.TYPE_CHECKING:
+    from PIL import Image
+
+class _SDXL:
+    def __init__(self, pipe, conf):
+        self.pipe = pipe
         self.conf = conf
         self.base = None
         self.model = None
-        self.load("stabilityai/stable-diffusion-xl-base-1.0")
-        # unload from gpu
+       
+    async def preload(self):
+        # loasd then unload
+        await self.load("stabilityai/stable-diffusion-xl-base-1.0", download_only=True)
+
+    def unload(self):
+        log.info("unloading sdxl")
         self.base = None
         self.model = None
 
-    async def load(self, model):
+    async def load(self, model, download_only=False):
+        loop = asyncio.get_running_loop()
+
         if model != self.model:
             tmp = url_to_tempfile(self.conf, model, prefix="sdxl.")
-            
+            base = None
             if not os.path.exists(tmp):
                 url = None
                 if model == "stabilityai/stable-diffusion-xl-base-1.0":
                     url = "https://gputopia.s3.amazonaws.com/models/sdxl.tar.gz"
                 if url:
                     await download_file(url, tmp + ".tar.gz")
-                    gunzip(tmp + ".tar.gz")
-                    self.base = ORTStableDiffusionXLPipeline.from_pretrained(tmp)
+                    await loop.run_in_executor(lambda: gunzip(tmp + ".tar.gz"))
+                    if not download_only:
+                        base = self.pipe.from_pretrained(tmp)
                 else:
-                    self.base = ORTStableDiffusionXLPipeline.from_pretrained(model,
-                                                                             trust_remote_code=False,
-                                                                             export=True)
-                    self.base.save_pretrained(tmp)
+                    base = await loop.run_in_executor(lambda: self.pipe.from_pretrained(model, trust_remote_code=False, export=True))
+                    base.save_pretrained(tmp)
             else:
-                self.base = ORTStableDiffusionXLPipeline.from_pretrained(tmp)
-            self.base.to("cuda")
-            self.model = model
+                if not download_only:
+                    base = self.pipe.from_pretrained(tmp)
+
+            if not download_only:
+                log.info("moving sdxl to cuda")
+                base.to("cuda")
+                self.base = base
+                self.model = model
 
     def temp_file(self, name, wipe=False):
         ret = os.path.join(self.conf.tmp_dir, name)
@@ -43,14 +64,29 @@ class SDXL:
 
     async def handle_req(self, req):
         await self.load("stabilityai/stable-diffusion-xl-base-1.0")
+    
         sz = req.get("size", "1024x1024")
         w, h = sz.split("x")
+        
         w = int(w)
         h = int(h)
+        
         n = req.get("n", 1)
-        images = self.run(req.get("prompt"), n, w, h)
-        ret = {"object": "list",
-               "data": [{"object": "image", "index": idx, "data": img} for idx, img in enumerate(images)]
+        
+        images = self.run(req.get("prompt"), n, w, h, req.get("hyperparameters", {}))
+       
+        data = []
+        
+        for idx, img in enumerate(images):
+            buffered = BytesIO()
+            img.save(buffered, format="JPEG")
+            img_str = base64.b64encode(buffered.getvalue())
+            data.append({"object": "image", "index": idx, "data": img_str})
+        
+        ret = {
+               "created": int(time.time()),
+               "object": "list",
+               "data": data
                }
         return ret
 
@@ -59,23 +95,25 @@ class SDXL:
             prompt: str,
             n: int,
             width: int,
-            height: int
-    ) -> list[Image]:
-        images = self._run(
-            prompt=prompt,
-            width=width,
-            height=height,
-            n=n
-        )
-        return images
+            height: int,
+            hp: dict
+    ) -> list["Image"]:
+        ret = self.base(prompt=prompt, width=width, height=height, num_images_per_prompt=n, num_inference_steps=hp.get("steps", 50))
+        return ret.images
 
-    def _run(
-            self,
-            *,
-            prompt,
-            width,
-            height,
-            n
-    ):
-        images = self.base(prompt=prompt, width=width, height=height, num_images_per_prompt=n).images
-        return images
+
+def SDXL(conf) -> Optional[_SDXL]:
+    try:
+        if "sdxl" not in conf.enable:
+            return None
+        from optimum.onnxruntime import ORTStableDiffusionXLPipeline
+        import onnxruntime as ort
+        if ort.get_device() != "GPU" and not os.environ.get("CI"):
+            log.exception("sdxl not enabled, ort runtime does not see the GPU")
+            return None
+        return _SDXL(ORTStableDiffusionXLPipeline, conf)
+    except ImportError:
+        if os.environ.get("GPUTOPIA_DEBUG_IMPORT"):
+            log.exception("sdxl not enabled")
+        return None
+

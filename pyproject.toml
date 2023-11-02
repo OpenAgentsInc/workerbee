@@ -73,21 +73,17 @@ onnx = "^1.15.0"
 tqdm = "^4.66.1"
 onnxruntime-gpu = "^1.16.1"
 fastembed = "^0.1.1"
-optimum = {extras = ["onnxruntime-gpu"], version = "^1.13.2"}
 diffusers = "^0.21.4"
 Pillow = "^10.1.0"
 
-
 [tool.poetry.group.dev-onnx]
 optional = true
-
 
 [tool.poetry.group.dev-onnx.dependencies]
 onnx = "^1.15.0"
 tqdm = "^4.66.1"
 fastembed = "^0.1.1"
 onnxruntime = "^1.16.1"
-optimum = {extras = ["onnxruntime-gpu"], version = "^1.13.2"}
 diffusers = "^0.21.4"
 Pillow = "^10.1.0"
 
