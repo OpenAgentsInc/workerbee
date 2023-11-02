@@ -1,45 +1,68 @@
-from io import BytesIO
-from typing import Optional
-import torch
-from diffusers import DiffusionPipeline
+import os
+from hashlib import md5
+
 from PIL import Image
 from optimum.onnxruntime import ORTStableDiffusionXLPipeline
 
+
 class SDXL:
-    def __init__(self):
-        cuda_available = torch.cuda.is_available()
+    def __init__(self, conf):
+        self.conf = conf
+        self.base = None
+        self.model = None
+        self.load("stabilityai/stable-diffusion-xl-base-1.0")
 
-        if cuda_available:
-            self.device = torch.device("cuda")
-        else:
-            self.device = torch.device("cpu")
+    def load(self, model):
+        if model != self.model:
+            model_hash = md5(model.encode()).hexdigest()
+            tmp = self.temp_file("sdxl." + model_hash)
+            if not os.path.exists(tmp):
+                self.base = ORTStableDiffusionXLPipeline.from_pretrained(model,
+                                                                         export=True,
+                                                                         resume_download=True)
+                self.base.save_pretrained(tmp)
+            else:
+                self.base = ORTStableDiffusionXLPipeline.from_pretrained(tmp)
 
-        # Load the base model
-        self.base = ORTStableDiffusionXLPipeline.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0")
-        # Save ONNX model in the same directory as the SDXL.py
-        save_directory = "./sd_xl_base_onnx_model" 
-        self.base.save_pretrained(save_directory)
+    def temp_file(self, name, wipe=False):
+        ret = os.path.join(self.conf.tmp_dir, name)
+        return ret
 
-        self._refiner = None
+    def handle_req(self, req):
+        self.load("stabilityai/stable-diffusion-xl-base-1.0")
+        sz = req.get("size", "1024x1024")
+        w, h = sz.split("x")
+        w = int(w)
+        h = int(h)
+        n = req.get("n", 1)
+        images = self.run(req.get("prompt"), n, w, h)
+        ret = {"object": "list",
+               "data": [{"object": "image", "index": idx, "data": img} for idx, img in enumerate(images)]
+               }
+        return ret
 
     def run(
-        self,
-        prompt: str,
-        width: Optional[int] = None,
-        height: Optional[int] = None
-    ) -> Image:
+            self,
+            prompt: str,
+            n: int,
+            width: int,
+            height: int
+    ) -> list[Image]:
         images = self._run(
             prompt=prompt,
             width=width,
-            height=height
+            height=height,
+            n=n
         )
-        return images[0]
+        return images
 
     def _run(
-        self,
-        prompt,
-        width,
-        height
+            self,
+            *,
+            prompt,
+            width,
+            height,
+            n
     ):
-        images = self.base(prompt=prompt, width=width, height=height).images
+        images = self.base(prompt=prompt, width=width, height=height, num_images_per_prompt=n).images
         return images

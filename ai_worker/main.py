@@ -155,10 +155,9 @@ class WorkerMain:
         else:
             self.fine_tuner = None
         if SDXL:
-            self.sdxl = SDXL()
+            self.sdxl = SDXL(self.conf)
         else:
             self.sdxl = None
-
         self.fast_embed = FastEmbed(self.conf)
         
     def _gen_or_load_priv(self) -> None:
@@ -399,7 +398,7 @@ class WorkerMain:
                 async for event in self.fine_tuner.fine_tune(req.openai_req):
                     await self.ws_send(json.dumps(event), True)
                 await self.ws_send("{}")
-            elif req.openai_url == "/v1/image_generation":
+            elif req.openai_url == "/v1/images/generations":
                 await self.handle_image_generation(req.openai_req)
             elif req.openai_url == "/v1/embeddings" and model.startswith(MODEL_PREFIX):
                 res = self.fast_embed.embed(req.openai_req)
