@@ -43,9 +43,9 @@ def sdxl_inst(request):
     return request.getfixturevalue("sdxl_" + request.param)
 
 
-def test_imagegen_simple(sdxl_inst: "SDXL"):
+async def test_imagegen_simple(sdxl_inst: "SDXL"):
     req = {"prompt": "a dog", "n": 1, "size": "1024x1024"}
-    result = sdxl_inst.handle_req(req)
+    result = await sdxl_inst.handle_req(req)
     assert result["object"] == "list"
     assert result["data"][0]["object"] == "image"
     assert result["data"][0]["index"] == 0

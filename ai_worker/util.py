@@ -2,7 +2,7 @@ import base64
 import hashlib
 import os
 import tarfile
-
+from httpx import AsyncClient
 import llama_cpp
 
 GGML_TYPE_MAP = {
@@ -58,15 +58,37 @@ def user_ft_name_to_url(name):
     return name
 
 
-def url_to_tempfile(conf, url):
+def url_to_tempfile(conf, url, prefix=""):
     name = hashlib.md5(url.encode()).hexdigest()
-    output_file = os.path.join(conf.tmp_dir, name)
+    output_file = os.path.join(conf.tmp_dir, prefix + name)
     return output_file
 
 
 def gzip(folder):
-    """tar gz the folder to 'folder.tar.gz', removes the folder"""
+    """Tar gz the folder to 'folder.tar.gz'"""
     base_folder_name = os.path.basename(folder)
     with tarfile.open(f"{folder}.tar.gz", 'w:gz') as archive:
         archive.add(folder, arcname=base_folder_name)
     return f"{folder}.tar.gz"
+
+def gunzip(archive_path):
+    """Unzips 'folder.tar.gz' to 'folder', and removes the 'folder.tar.gz'"""
+
+    with tarfile.open(archive_path, 'r:gz') as archive:
+        archive.extractall(path=os.path.dirname(archive_path))
+    os.remove(archive_path)
+    folder_path = os.path.splitext(archive_path)[0]  # remove the .tar.gz extension
+    return folder_path
+
+
+async def download_file(url: str, output_file: str) -> str:
+    if not os.path.exists(output_file):
+        with open(output_file + ".tmp", "wb") as fh:
+            async with AsyncClient() as cli:
+                async with cli.stream("GET", url) as res:
+                    res: Response
+                    async for chunk in res.aiter_bytes():
+                        fh.write(chunk)
+        os.replace(output_file + ".tmp", output_file)
+    return output_file
+
