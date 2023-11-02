@@ -11,6 +11,8 @@ class SDXL:
         self.base = None
         self.model = None
         self.load("stabilityai/stable-diffusion-xl-base-1.0")
+        # unload model from ram at init time so the process starts ok
+        self.base = None
 
     def load(self, model):
         if model != self.model:
@@ -18,11 +20,12 @@ class SDXL:
             tmp = self.temp_file("sdxl." + model_hash)
             if not os.path.exists(tmp):
                 self.base = ORTStableDiffusionXLPipeline.from_pretrained(model,
-                                                                         export=True,
-                                                                         resume_download=True)
+                                                                         trust_remote_code=False,
+                                                                         export=True)
                 self.base.save_pretrained(tmp)
             else:
                 self.base = ORTStableDiffusionXLPipeline.from_pretrained(tmp)
+            self.model = model
 
     def temp_file(self, name, wipe=False):
         ret = os.path.join(self.conf.tmp_dir, name)
