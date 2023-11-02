@@ -32,7 +32,7 @@ log = logging.getLogger(__name__)
 
 try:
     from .fine_tune import FineTuner
-except ImportError as ex:
+except ImportError:
     if os.environ.get("GPUTOPIA_DEBUG_IMPORT"):
         log.exception("fine tuning not enabled")
     FineTuner = None
@@ -43,6 +43,7 @@ except ImportError as e:
     log.error(f"Failed to import SDXL: {e}")
     SDXL = None
 
+from .fast_embed import FastEmbed, MODEL_PREFIX
 from gguf_loader.main import get_size
 
 from .gguf_reader import GGUFReader
@@ -148,6 +149,7 @@ class WorkerMain:
         self.llama = None
         self.llama_model = None
         self.llama_cli: Optional[AsyncClient] = None
+        
         if FineTuner:
             self.fine_tuner = FineTuner(self.conf)
         else:
@@ -157,6 +159,8 @@ class WorkerMain:
         else:
             self.sdxl = None
 
+        self.fast_embed = FastEmbed(self.conf)
+        
     def _gen_or_load_priv(self) -> None:
         if not self.conf.privkey:
             cfg = self.conf.config
@@ -233,6 +237,10 @@ class WorkerMain:
 
         for gpu in info.nv_gpus:
             tot_mem += gpu.memory * 1000000
+        
+        if tot_mem == 0:
+            for gpu in info.cl_gpus:
+                tot_mem += gpu.memory * 1000000
 
         if est_ram > tot_mem:
             est_layers = tot_mem // (est_ram / layers)
@@ -245,9 +253,12 @@ class WorkerMain:
         return max(0, est_layers - self.conf.layer_offset)
 
     async def load_model(self, name):
+        assert name, "No model name"
         if name == self.llama_model:
             return
+        
         log.debug("loading model: %s", name)
+        
         model_path = await self.get_model(name)
 
         if llama_cpp.server.app.llama:
@@ -261,6 +272,7 @@ class WorkerMain:
                                  embedding=True, cache=True, port=8181,
                                  main_gpu=self.conf.main_gpu, tensor_split=sp)
         self.llama = create_llama_app(settings)
+        assert self.llama, "Load llama failed.   Try lowering layers."
         self.llama_cli = AsyncClient(app=self.llama, base_url="http://test")
         self.llama_model = name
 
@@ -273,6 +285,9 @@ class WorkerMain:
 
         if self.fine_tuner:
             caps += ["llama-fine-tune"]
+
+        if self.fast_embed:
+            caps += ["fast-embed"]
 
         connect_msg = ConnectMessage(
             worker_version=VERSION,
@@ -386,6 +401,9 @@ class WorkerMain:
                 await self.ws_send("{}")
             elif req.openai_url == "/v1/image_generation":
                 await self.handle_image_generation(req.openai_req)
+            elif req.openai_url == "/v1/embeddings" and model.startswith(MODEL_PREFIX):
+                res = self.fast_embed.embed(req.openai_req)
+                await self.ws_send(json.dumps(res), True)
             elif req.openai_req.get("stream"):
                 await self.load_model(model)
                 async with aconnect_sse(self.llama_cli, "POST", req.openai_url, json=req.openai_req) as sse:

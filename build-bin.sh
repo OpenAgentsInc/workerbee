@@ -12,10 +12,14 @@ fi
 
 with_torch=""
 if [ "$gpu" == "cuda-torch" ]; then
-    with_torch="--with torch"
+    with_torch="--with torch --with onnx"
     opts=""
 fi
 
+with_onnx=""
+if [ "$gpu" == "cuda" ]; then
+    with_torch="--with onnx"
+fi
 
 set -o xtrace
 

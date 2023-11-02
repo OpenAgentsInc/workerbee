@@ -1,12 +1,10 @@
 import gc
-import hashlib
 import json
 import asyncio
 import threading
 import logging
 import os
 import random
-import tarfile
 import shutil
 
 import transformers
@@ -17,7 +15,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import prepare_model_for_kbit_training, PeftModel, LoraConfig, get_peft_model
 from accelerate import FullyShardedDataParallelPlugin, Accelerator
 from torch.distributed.fsdp.fully_sharded_data_parallel import FullOptimStateDictConfig, FullStateDictConfig
-from ai_worker.util import quantize_gguf, url_to_tempfile, user_ft_name_to_url
+from ai_worker.util import quantize_gguf, url_to_tempfile, user_ft_name_to_url, gzip
 
 from ai_worker.util import b64enc
 from gguf_loader.convert import main as gguf_main
@@ -25,14 +23,6 @@ from gguf_loader.convert import main as gguf_main
 MAX_CONTEXT = 300000
 
 log = logging.getLogger(__name__)
-
-
-def gzip(folder):
-    """tar gz the folder to 'folder.tar.gz', removes the folder"""
-    base_folder_name = os.path.basename(folder)
-    with tarfile.open(f"{folder}.tar.gz", 'w:gz') as archive:
-        archive.add(folder, arcname=base_folder_name)
-    return f"{folder}.tar.gz"
 
 
 class FineTuner:

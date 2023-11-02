@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import math
 import struct
 import sys
 from enum import IntEnum
@@ -425,7 +424,7 @@ def main():
     data = np.memmap(cfg.input, mode = 'r')
     model = GGMLModel()
     print('* Scanning GGML input file')
-    offset = model.load(data, 0)
+    model.load(data, 0)
     print(f'* GGML model hyperparameters: {model.hyperparameters}')
     vocab_override = None
     params_override = None
