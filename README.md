@@ -35,7 +35,7 @@ options:
 
 ## How to build the worker from source:
 
-When building, please ensure you have CUDA installd or OPENCL (for AMD chips).   You can also do a METAL build for OSX.
+When building, please ensure you have CUDA installed or OPENCL (for AMD chips).   You can also do a METAL build for OSX.
 
 ### CUDA/NVIDIA build
 `CMAKE_ARGS="-DLLAMA_CUBLAS=1" FORCE_CMAKE=1 poetry install`
