@@ -18,6 +18,8 @@ import psutil
 import websockets
 from httpx import Response, AsyncClient
 from httpx_sse import aconnect_sse
+from llama_cpp.llama_chat_format import register_chat_format, _get_system_message, _map_roles, \
+    ChatFormatterResponse, get_chat_format, _format_no_colon_single
 from llama_cpp.server.app import Settings as LlamaSettings, create_app as create_llama_app
 import llama_cpp.server.app
 from pydantic import BaseModel, Field
@@ -51,6 +53,36 @@ ENV_PREFIX = APP_NAME.upper()
 DEFAULT_COORDINATOR = "wss://queenbee.gputopia.ai/worker"
 
 load_dotenv()
+
+try:
+    get_chat_format("mistral")
+except (ValueError, KeyError):
+    @register_chat_format("mistral")
+    def format_mistral(messages, **kwargs):
+        _roles = dict(user="[INST]", assistant="[/INST]")
+        _sep = " "
+        system_message = _get_system_message(messages)
+        _messages = _map_roles(messages, _roles)
+        _messages[0] = (_messages[0][0], system_message + " " + _messages[0][1])
+        _messages.append((_roles["assistant"], None))
+        _prompt = _format_no_colon_single("", _messages, _sep)
+        return ChatFormatterResponse(prompt=_prompt)
+
+
+try:
+    get_chat_format("zephyr")
+except (ValueError, KeyError):
+    @register_chat_format("zephyr")
+    def format_zephyr(messages, **kwargs):
+        _system_template = "<|system|>\n{system_message}</s>\n"
+        _roles = dict(user="<|user|>\n", assistant="<|assistant|>\n")
+        _sep = "</s>"
+        system_message = _get_system_message(messages)
+        system_message = _system_template.format(system_message=system_message)
+        _messages = _map_roles(messages, _roles)
+        _messages.append((_roles["assistant"], None))
+        _prompt = _format_no_colon_single(system_message, _messages, _sep)
+        return ChatFormatterResponse(prompt=_prompt)
 
 
 class Req(BaseModel):
@@ -254,6 +286,15 @@ class WorkerMain:
         settings = LlamaSettings(model=model_path, n_gpu_layers=await self.guess_layers(model_path), seed=-1,
                                  embedding=True, cache=True, port=8181,
                                  main_gpu=self.conf.main_gpu, tensor_split=sp)
+        if "vicuna" in name.lower():
+            settings.chat_format = "vicuna"
+
+        if "mistral" in name.lower():
+            settings.chat_format = "mistral"
+
+        if "zephyr" in name.lower():
+            settings.chat_format = "zephyr"
+
         self.llama = create_llama_app(settings)
         assert self.llama, "Load llama failed.   Try lowering layers."
         self.llama_cli = AsyncClient(app=self.llama, base_url="http://test")
