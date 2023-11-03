@@ -70,6 +70,21 @@ except (ValueError, KeyError):
 
 
 try:
+    get_chat_format("wizard")
+except (ValueError, KeyError):
+    @register_chat_format("wizard")
+    def format_wizard(messages, **kwargs):
+        _roles = dict(user="USER:", assistant="ASSISTANT:")
+        _sep = "\n"
+        system_message = ""
+        _messages = _map_roles(messages, _roles)
+        _messages[0] = (_messages[0][0], system_message + " " + _messages[0][1])
+        _messages.append((_roles["assistant"], None))
+        _prompt = _format_no_colon_single("", _messages, _sep)
+        return ChatFormatterResponse(prompt=_prompt)
+
+
+try:
     get_chat_format("zephyr")
 except (ValueError, KeyError):
     @register_chat_format("zephyr")
@@ -286,13 +301,14 @@ class WorkerMain:
         settings = LlamaSettings(model=model_path, n_gpu_layers=await self.guess_layers(model_path), seed=-1,
                                  embedding=True, cache=True, port=8181,
                                  main_gpu=self.conf.main_gpu, tensor_split=sp)
+        # pick a template
         if "vicuna" in name.lower():
             settings.chat_format = "vicuna"
-
-        if "mistral" in name.lower():
+        elif "mistral" in name.lower():
             settings.chat_format = "mistral"
-
-        if "zephyr" in name.lower():
+        elif "wizard" in name.lower():
+            settings.chat_format = "wizard"
+        elif "zephyr" in name.lower():
             settings.chat_format = "zephyr"
 
         self.llama = create_llama_app(settings)
