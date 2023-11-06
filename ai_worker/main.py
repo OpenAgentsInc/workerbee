@@ -105,7 +105,7 @@ class Config(BaseSettings):
     main_gpu: int = 0
     tensor_split: str = Field("", description="comma-delimited list of ratio numbers, one for each gpu")
     force_layers: int = Field(0, description="force layers to load in the gpu")
-    layer_offset: int = Field(2, description="reduce the layer guess by this")
+    layer_offset: int = Field(4, description="reduce the layer guess by this")
     tmp_dir: str = Field(os.path.join(tempfile.gettempdir(), "gputopia-worker"),
                          description="temp folder for data files and checkpoints")
 
@@ -230,6 +230,9 @@ class WorkerMain:
 
         layers = rd.layers()
         est_ram = rd.vram_estimate()
+
+        # leave room for context
+        est_ram += 500000000
 
         info = self.connect_info()
 
