@@ -136,7 +136,8 @@ class WorkerMain:
         self.llama = None
         self.llama_model = None
         self.llama_cli: Optional[AsyncClient] = None
-        
+        self.mods: List[str] = self.get_mod_list()
+
         if FineTuner:
             self.fine_tuner = FineTuner(self.conf)
         else:
@@ -426,11 +427,30 @@ class WorkerMain:
                         async for chunk in res.aiter_bytes():
                             fh.write(chunk)
             os.replace(output_file + ".tmp", output_file)
-            self.note_have(url)
         return output_file
 
-    def note_have(self, url: str):  # noqa
-        pass # todo: save loaded models list somewhere neutral, so we can support url as well as hf
+    def note_have(self, name: str):  # noqa
+        cfg_path = self.conf.config
+        try:
+            with open(cfg_path + ".models") as fh:
+                self.mods = json.load(fh)
+        except (json.JSONDecodeError, FileNotFoundError):
+            self.mods = []
+
+        self.mods += [name]
+        with open(cfg_path + ".models", "w") as fh:
+            json.dump(self.mods, fh)
+
+    def get_mod_list(self) -> List[str]:
+        cfg_path = self.conf.config
+        try:
+            with open(cfg_path + ".models") as fh:
+                mods = json.load(fh)
+        except (json.JSONDecodeError, FileNotFoundError):
+            mods = []
+
+        
+        return mods
 
     async def download_model(self, name):
         # uses hf cache, so no need to handle here
@@ -438,13 +458,16 @@ class WorkerMain:
             name = user_ft_name_to_url(name)
 
         if name.startswith("https:"):
-            return await self.download_file(name)
+            self.note_have(name)
+            ret = await self.download_file(name)
+            return ret
 
         from gguf_loader.main import download_gguf
         size = get_size(name)
         await self.free_up_space(size)
         loop = asyncio.get_running_loop()
         path = await loop.run_in_executor(None, lambda: download_gguf(name))
+        self.note_have(name)
         return path
 
     def report_done(self, name):
@@ -455,6 +478,7 @@ class WorkerMain:
 
     async def free_up_space(self, size):
         pass
+
 
 
 def main(argv=None):
