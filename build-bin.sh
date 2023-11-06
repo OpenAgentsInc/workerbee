@@ -3,10 +3,22 @@
 gpu="$1"
 arch="$2"
 cmake="$3"
+opts="--onefile"
 
 if [ -z "$cmake" -o -z "$gpu" ]; then
     echo usage build-bin.sh gpu arch "cmake-args"
     exit 1
+fi
+
+with_torch=""
+if [ "$gpu" == "cuda-torch" ]; then
+    with_torch="--with torch --with onnx"
+    opts=""
+fi
+
+with_onnx=""
+if [ "$gpu" == "cuda" ]; then
+    with_torch="--with onnx"
 fi
 
 set -o xtrace
@@ -22,10 +34,17 @@ pip uninstall -y llama-cpp-python
 rm -f ~/AppData/Local/pypoetry/Cache/artifacts/*/*/*/*/llama*
 rm -f ~/.cache/pypoetry/artifacts/*/*/*/*/llama*
 
-CMAKE_ARGS="$cmake" FORCE_CMAKE=1 poetry install
+CMAKE_ARGS="$cmake" FORCE_CMAKE=1 poetry install $with_torch
 
 python build-version.py
 
-./pyinstaller.sh $gpu-$arch
+./pyinstaller.sh $gpu-$arch $opts
+
+if [ "$gpu" == "cuda-torch" ]; then
+    pushd dist
+    tar cvf - gputopia-worker-$gpu-$arch/ | pigz -9 - > gputopia-worker-$gpu-$arch.tar.gz
+    rm -rf gputopia-worker-$gpu-$arch/
+    popd
+fi
 
 deactivate

@@ -131,8 +131,8 @@ class GGUFReader:
 
         self.gguf_version = struct.unpack("<I", self.fin.read(4))[0]
 
-        if self.gguf_version != 2:
-            raise ValueError("Can only summarize version 2 files")
+        if self.gguf_version < 2:
+            raise ValueError("Can only summarize version 2/3 files, got version %s" % self.gguf_version)
 
         self.ti_data_count = struct.unpack("<Q", self.fin.read(8))[0]
         self.kv_data_count = struct.unpack("<Q", self.fin.read(8))[0]
@@ -216,7 +216,6 @@ class GGUFReader:
         return None
 
     def value_size(self):
-        num_size = 32
         kvd = self.kv_data
         if qv:= kvd.get("general.quantization_version"):
             return GGML_SIZE_MAP.get(qv, 16)

@@ -35,14 +35,14 @@ options:
 
 ## How to build the worker from source:
 
-When building, please ensure you have CUDA installd or OPENCL (for AMD chips).   You can also do a METAL build for OSX.
+When building, please ensure you have CUDA installed or OPENCL (for AMD chips).   You can also do a METAL build for OSX.
 
 ### CUDA/NVIDIA build
-`CMAKE_ARGS="-DLLAMA_CUBLAS=1" FORCE_CMAKE=1 poetry install`
+`CMAKE_ARGS="-DLLAMA_CUBLAS=1" FORCE_CMAKE=1 poetry install --with onnx`
 
 ### OSX/METAL build:
 
-`CMAKE_ARGS="-DLLAMA_METAL=1" FORCE_CMAKE=1 poetry install`
+`CMAKE_ARGS="-DLLAMA_METAL=1" FORCE_CMAKE=1 poetry install --with onnx`
 
 if you want it to see the gpus!
 
@@ -63,12 +63,15 @@ cmake --build . --config Release
 cmake --install . --prefix C:/CLBlast
 ```
 
-`CMAKE_ARGS="-DLLAMA_CLBLAST=ON -DCMAKE_PREFIX_PATH=C:/CLBlast/lib/cmake/CLBlast" FORCE_CMAKE=1 poetry install`
+`CMAKE_ARGS="-DLLAMA_CLBLAST=ON -DCMAKE_PREFIX_PATH=C:/CLBlast/lib/cmake/CLBlast" FORCE_CMAKE=1 poetry install --with onnx`
 
 
 ### Run a dev-mode worker
-- `poetry shell`
 - `poetry run gputopia_worker`
+
+### Run a re-quantization on a gguf
+- `poetry run quantize_gguf`
+
 
 
 ### Run tests to be sure it really works
