@@ -126,6 +126,8 @@ def get_model_abbr(repo, fp):
     else:
         ret = repo
     return ret
+
+
 def get_model_list():
     hf_cache_info = scan_cache_dir()
     ml = set()
@@ -141,6 +143,7 @@ def get_model_list():
             if "gguf" in fp:
                 ml.add(get_model_abbr(repo, fp))
     return list(ml)
+
 
 # Load environment variables from .env file
 load_dotenv()
