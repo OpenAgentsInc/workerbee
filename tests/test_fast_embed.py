@@ -17,6 +17,7 @@ def fastembed_onnx():
 
 @pytest.fixture
 def fastembed_mocked(monkeypatch):
+    monkeypatch.setenv("CI", "1")
     mod = MagicMock()
     monkeypatch.setitem(sys.modules, 'fastembed.embedding', mod)
     conf = Config()
