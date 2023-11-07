@@ -129,21 +129,23 @@ def get_model_abbr(repo, fp):
 
 
 def get_model_list():
-    hf_cache_info = scan_cache_dir()
-    ml = set()
-    for ent in hf_cache_info.repos:
-        repo = ent.repo_id
-        rev = next(iter(ent.revisions))
-        for f in rev.files:
-            fp = str(f.file_path)
-            if "ggml" in fp:
-                gg = ggml_dest_path(fp)
-                if os.path.exists(gg):
-                    ml.add(get_model_abbr(repo, gg))
-            if "gguf" in fp:
-                ml.add(get_model_abbr(repo, fp))
-    return list(ml)
-
+    try:
+        hf_cache_info = scan_cache_dir()
+        ml = set()
+        for ent in hf_cache_info.repos:
+            repo = ent.repo_id
+            rev = next(iter(ent.revisions))
+            for f in rev.files:
+                fp = str(f.file_path)
+                if "ggml" in fp:
+                    gg = ggml_dest_path(fp)
+                    if os.path.exists(gg):
+                        ml.add(get_model_abbr(repo, gg))
+                if "gguf" in fp:
+                    ml.add(get_model_abbr(repo, fp))
+        return list(ml)
+    except (FileNotFoundError, CacheNotFound):
+        return []
 
 # Load environment variables from .env file
 load_dotenv()
