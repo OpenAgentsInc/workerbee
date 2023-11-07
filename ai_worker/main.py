@@ -84,6 +84,7 @@ class ConnectMessage(BaseModel):
     cl_driver_version: Optional[str] = None
     cl_gpus: Optional[List[GpuInfo]] = []
     web_gpus: Optional[List[GpuInfo]] = []
+    models: List[str] = []
 
 
 class Config(BaseSettings):
@@ -136,7 +137,7 @@ class WorkerMain:
         self.llama = None
         self.llama_model = None
         self.llama_cli: Optional[AsyncClient] = None
-        
+
         if FineTuner:
             self.fine_tuner = FineTuner(self.conf)
         else:
@@ -223,7 +224,7 @@ class WorkerMain:
 
         for gpu in info.nv_gpus:
             tot_mem += gpu.memory * 1000000
-        
+
         if tot_mem == 0:
             for gpu in info.cl_gpus:
                 tot_mem += gpu.memory * 1000000
@@ -242,9 +243,9 @@ class WorkerMain:
         assert name, "No model name"
         if name == self.llama_model:
             return
-        
+
         log.debug("loading model: %s", name)
-        
+
         model_path = await self.get_model(name)
 
         if llama_cpp.server.app.llama:
@@ -275,6 +276,8 @@ class WorkerMain:
         if self.fast_embed:
             caps += ["fast-embed"]
 
+        model_list = self.get_model_list()
+
         connect_msg = ConnectMessage(
             worker_version=VERSION,
             capabilities=caps,
@@ -286,6 +289,7 @@ class WorkerMain:
             disk_space=int(disk_space),
             cpu_count=multiprocessing.cpu_count(),
             vram=psutil.virtual_memory().available,
+            models=model_list
         )
 
         self.sign(connect_msg)
@@ -347,7 +351,8 @@ class WorkerMain:
         await self.ws_conn()
         try:
             return await self.conn.send(msg)
-        except (websockets.ConnectionClosedError, websockets.ConnectionClosed, websockets.exceptions.ConnectionClosedError):
+        except (
+        websockets.ConnectionClosedError, websockets.ConnectionClosed, websockets.exceptions.ConnectionClosedError):
             self.conn = None
             raise
 
@@ -355,7 +360,8 @@ class WorkerMain:
         await self.ws_conn()
         try:
             return await self.conn.recv()
-        except (websockets.ConnectionClosedError, websockets.ConnectionClosed, websockets.exceptions.ConnectionClosedError):
+        except (
+        websockets.ConnectionClosedError, websockets.ConnectionClosed, websockets.exceptions.ConnectionClosedError):
             self.conn = None
             raise
 
@@ -401,7 +407,8 @@ class WorkerMain:
                 await self.ws_send(res.text)
             en = time.monotonic()
             log.info("done %s (%s secs)", model, en - st)
-        except (websockets.ConnectionClosedError, websockets.ConnectionClosed, websockets.exceptions.ConnectionClosedError):
+        except (
+        websockets.ConnectionClosedError, websockets.ConnectionClosed, websockets.exceptions.ConnectionClosedError):
             log.error("disconnected while running request: %s", req_str)
             if event:
                 log.error("was sending event: %s", event)
@@ -426,31 +433,93 @@ class WorkerMain:
                         async for chunk in res.aiter_bytes():
                             fh.write(chunk)
             os.replace(output_file + ".tmp", output_file)
-            self.note_have(url)
         return output_file
 
-    def note_have(self, url: str):  # noqa
-        pass # todo: save loaded models list somewhere neutral, so we can support url as well as hf
+    def note_have(self, name: str):  # noqa
+        mods = self.get_model_info_from_config()
+        mods[name] = {"time": time.time()}
+        self.write_model_info_to_config(mods)
+
+    def note_dropped(self, name: str):  # noqa
+        mods = self.get_model_info_from_config()
+        mods.pop(name, None)
+        self.write_model_info_to_config(mods)
+
+    def write_model_info_to_config(self, mods):
+        cfg_path = self.conf.config
+        with open(cfg_path + ".models.tmp", "w") as fh:
+            json.dump(mods, fh)
+        os.replace(cfg_path + ".models.tmp", cfg_path + ".models")
+
+    def get_model_info_from_config(self) -> dict[str]:
+        cfg_path = self.conf.config
+        try:
+            with open(cfg_path + ".models") as fh:
+                mods = json.load(fh)
+        except (json.JSONDecodeError, FileNotFoundError):
+            mods = {}
+        return mods
+
+    def check_have_url_model(self, name: str):
+        if name.startswith(USER_PREFIX):
+            name = user_ft_name_to_url(name)
+        if not name.startswith("https:"):
+            return False
+        output_file = url_to_tempfile(self.conf, name)
+        if not os.path.exists(output_file):
+            return False
+        return True
 
     async def download_model(self, name):
         # uses hf cache, so no need to handle here
+        orig_name = name
+
         if name.startswith(USER_PREFIX):
             name = user_ft_name_to_url(name)
 
         if name.startswith("https:"):
-            return await self.download_file(name)
+            ret = await self.download_file(name)
+            self.note_have(orig_name)
+            return ret
 
         from gguf_loader.main import download_gguf
         size = get_size(name)
         await self.free_up_space(size)
         loop = asyncio.get_running_loop()
         path = await loop.run_in_executor(None, lambda: download_gguf(name))
+        self.note_have(orig_name)
+
         return path
 
-    def report_done(self, name):
-        print("\r", name, 100)
+    def get_model_list(self) -> list[str]:
+        dct = self.get_model_info_from_config()
 
-    def report_pct(self, name, pct):
+        # search hf caceh
+        from gguf_loader.main import get_model_list
+
+        all_cached = set()
+        for ent in get_model_list():
+            all_cached.add(ent)
+            if ent not in dct:
+                # stuff in the config, if we never saw it before
+                self.note_have(ent)
+
+        # prune list to ones you really have
+        for k in list(dct.keys()):
+            if k not in all_cached and not self.check_have_url_model(k):
+                self.note_dropped(k)
+
+        dct = self.get_model_info_from_config()
+
+        # force loaded to be first/pref
+        if self.llama_model:
+            dct[self.llama_model] = {"time": time.time()}
+
+        # most recent first, which is always the loaded one
+        return sorted(dct.keys(), key=lambda k: dct[k].get("time"), reverse=True)
+
+    @staticmethod
+    def report_pct(name, pct):
         print("\r", name, pct, end='')
 
     async def free_up_space(self, size):

@@ -1,11 +1,12 @@
 import argparse
 import os.path
+import re
 import sys
 
 from dotenv import load_dotenv
 import os
 
-from huggingface_hub import hf_hub_download, snapshot_download
+from huggingface_hub import hf_hub_download, snapshot_download, scan_cache_dir, CacheNotFound
 from huggingface_hub import HfFileSystem
 from gguf_loader.convert_llama_ggml_to_gguf import main as convert_to_gguf_main
 from gguf_loader.convert import main as pytorch_to_gguf_main
@@ -13,15 +14,20 @@ import logging as log
 
 
 def pytorch_to_gguf(path):
-    dest = path + "/ggml-model-f16.gguf"
+    dest = pth_dest_path(path)
     sys.argv = ["convert", path, "--outfile", dest + ".tmp"]
     pytorch_to_gguf_main()
     os.replace(dest + ".tmp", dest)
     return dest
 
 
+def pth_dest_path(path):
+    dest = path + "/ggml-model-f16.gguf"
+    return dest
+
+
 def convert_to_gguf(file):
-    dest = file + ".gguf"
+    dest = ggml_dest_path(file)
     if os.path.exists(dest) and os.path.getsize(dest):
         return dest
     sys.argv = ["convert-to-gguf", "-i", file, "-o", dest + ".tmp", "--eps", "1e-5"]
@@ -29,6 +35,11 @@ def convert_to_gguf(file):
         sys.argv += ["--gqa", "8"]
     convert_to_gguf_main()
     os.replace(dest + ".tmp", dest)
+    return dest
+
+
+def ggml_dest_path(file):
+    dest = file + ".gguf"
     return dest
 
 
@@ -106,6 +117,35 @@ def download_gguf(name):
     log.debug("downloading...")
     return hf_hub_download(repo_id=repo_id, filename=base)
 
+
+def get_model_abbr(repo, fp):
+    m = re.match(r".*\d+b.*(q[_.-]?\d([_.-]k)?([_.-](m|s))?)([_.-]\d)?", fp, re.I)
+    if m:
+        filt = m[1]
+        ret = repo + ":" + filt
+    else:
+        ret = repo
+    return ret
+
+
+def get_model_list():
+    try:
+        hf_cache_info = scan_cache_dir()
+        ml = set()
+        for ent in hf_cache_info.repos:
+            repo = ent.repo_id
+            rev = next(iter(ent.revisions))
+            for f in rev.files:
+                fp = str(f.file_path)
+                if "ggml" in fp:
+                    gg = ggml_dest_path(fp)
+                    if os.path.exists(gg):
+                        ml.add(get_model_abbr(repo, gg))
+                if "gguf" in fp:
+                    ml.add(get_model_abbr(repo, fp))
+        return list(ml)
+    except (FileNotFoundError, CacheNotFound):
+        return []
 
 # Load environment variables from .env file
 load_dotenv()
