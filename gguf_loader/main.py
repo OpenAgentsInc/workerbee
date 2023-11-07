@@ -6,7 +6,7 @@ import sys
 from dotenv import load_dotenv
 import os
 
-from huggingface_hub import hf_hub_download, snapshot_download, scan_cache_dir
+from huggingface_hub import hf_hub_download, snapshot_download, scan_cache_dir, CacheNotFound
 from huggingface_hub import HfFileSystem
 from gguf_loader.convert_llama_ggml_to_gguf import main as convert_to_gguf_main
 from gguf_loader.convert import main as pytorch_to_gguf_main
