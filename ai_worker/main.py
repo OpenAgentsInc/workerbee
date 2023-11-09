@@ -619,6 +619,7 @@ For example:
 
     # too annoying to deal with Listeral list
     parser.add_argument("--enable", choices=["sdxl"], nargs="+")
+    arg_names.append("enable")
 
     args = parser.parse_args(args=argv)
 

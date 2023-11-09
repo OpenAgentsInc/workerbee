@@ -4,6 +4,7 @@ import os
 import tarfile
 from httpx import AsyncClient
 import llama_cpp
+import asyncio
 
 GGML_TYPE_MAP = {
     0: "F32",
