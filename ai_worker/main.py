@@ -261,7 +261,7 @@ class WorkerMain:
 
         return max(0, est_layers - self.conf.layer_offset)
 
-    def clear_llama_model():
+    def clear_llama_model(self):
         if llama_cpp.server.app.llama:
             # critical... must del this before creating a new app
             llama_cpp.server.app.llama = None
