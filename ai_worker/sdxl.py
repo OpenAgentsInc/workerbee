@@ -110,10 +110,9 @@ def SDXL(conf) -> Optional[_SDXL]:
 
         from diffusers import StableDiffusionXLPipeline
         import torch
-        if not torch.cuda.is_available() and not os.environ.get("CI"):
-            log.exception("SDXL not enabled, PyTorch does not see the GPU")
+        assert torch.cuda.is_available() or os.environ.get("CI"), "Cuda not available, SDXL disabled"
         return _SDXL(pipe=StableDiffusionXLPipeline, torch=torch, conf=conf)
-    except ImportError:
+    except (ImportError, AssertionError):
         if os.environ.get("GPUTOPIA_DEBUG_IMPORT"):
             log.exception("sdxl not enabled")
         return None
