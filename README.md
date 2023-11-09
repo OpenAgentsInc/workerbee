@@ -38,11 +38,11 @@ options:
 When building, please ensure you have CUDA installed or OPENCL (for AMD chips).   You can also do a METAL build for OSX.
 
 ### CUDA/NVIDIA build
-`CMAKE_ARGS="-DLLAMA_CUBLAS=1" FORCE_CMAKE=1 poetry install`
+`CMAKE_ARGS="-DLLAMA_CUBLAS=1" FORCE_CMAKE=1 poetry install --with onnx`
 
 ### OSX/METAL build:
 
-`CMAKE_ARGS="-DLLAMA_METAL=1" FORCE_CMAKE=1 poetry install`
+`CMAKE_ARGS="-DLLAMA_METAL=1" FORCE_CMAKE=1 poetry install --with onnx`
 
 if you want it to see the gpus!
 
@@ -63,7 +63,7 @@ cmake --build . --config Release
 cmake --install . --prefix C:/CLBlast
 ```
 
-`CMAKE_ARGS="-DLLAMA_CLBLAST=ON -DCMAKE_PREFIX_PATH=C:/CLBlast/lib/cmake/CLBlast" FORCE_CMAKE=1 poetry install`
+`CMAKE_ARGS="-DLLAMA_CLBLAST=ON -DCMAKE_PREFIX_PATH=C:/CLBlast/lib/cmake/CLBlast" FORCE_CMAKE=1 poetry install --with onnx`
 
 
 ### Run a dev-mode worker
