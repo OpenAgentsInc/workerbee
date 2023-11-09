@@ -87,9 +87,8 @@ class _SDXL:
         
         ret = {
                "created": int(time.time()),
-               "object": "list",
                "data": data
-               }
+              }
         return ret
 
     def run(

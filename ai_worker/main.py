@@ -124,7 +124,6 @@ class ImageData(BaseModel):
 
 class ImageResponse(BaseModel):
     created: int
-    object: str
     data: List[ImageData]
 
 
