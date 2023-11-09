@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ai-worker"
-version = "0.3.0"
+version = "0.3.1"
 description = "An ai worker that posts capabilities, and accepts jobs"
 authors = ["erik aronesty <erik@q32.com>"]
 license = "MIT"
