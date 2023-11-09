@@ -39,18 +39,26 @@ class FineTuner:
     def massage_line(self, ln, job):
         # toss our role for now, for some reason it didn't work
         # todo: check for role support in template
-        j = json.loads(ln)
 
-        if pr := j.get("prompt"):
-            # todo: use templates properly to massage data for instruct vs chat
-            j = json.loads(ln)
-            cm = j["completion"]
-            j = {"messages": [{"role": "user", "content": pr}, {"role": "assistant", "content": cm}]}
+        if not ln.strip():
+            # skip blank
+            return None
 
-        if "mistral" in job["model"].lower():
+        try:
             j = json.loads(ln)
-            j["messages"] = [m for m in j["messages"] if m["role"] != "system"]
-            ln = json.dumps(j) + "\n"
+            if pr := j.get("prompt"):
+                # todo: use templates properly to massage data for instruct vs chat
+                j = json.loads(ln)
+                cm = j["completion"]
+                j = {"messages": [{"role": "user", "content": pr}, {"role": "assistant", "content": cm}]}
+
+            if "mistral" in job["model"].lower():
+                j = json.loads(ln)
+                j["messages"] = [m for m in j["messages"] if m["role"] != "system"]
+                ln = json.dumps(j) + "\n"
+        except (KeyError, ValueError, json.JSONDecodeError) as ex:
+            log.error("fine tune: %s error %s with training line: %s", job.get("id"), repr(ex), ln)
+            assert False, "fine tune: invalid training data: '%s': %s " % (ln, repr(ex))
 
         return ln
 
@@ -69,6 +77,8 @@ class FineTuner:
                     ln = inp.readline(MAX_CONTEXT)
                     while ln:
                         ln = self.massage_line(ln, job)
+                        if not ln:
+                            continue
                         cnt += 1
                         if ec and (random.random() > training_split_pct or tc <= ec):
                             tc += 1
@@ -77,6 +87,9 @@ class FineTuner:
                             ec += 1
                             ef.write(ln)
                         ln = inp.readline(MAX_CONTEXT)
+
+        assert tc != 0 and ec != 0, "not enough valid training data"
+
         return train_file, eval_file
 
     async def fine_tune(self, job):

@@ -450,7 +450,8 @@ class WorkerMain:
             log.info("done %s (%s secs)", model, en - st)
         except (
         websockets.ConnectionClosedError, websockets.ConnectionClosed, websockets.exceptions.ConnectionClosedError):
-            log.error("disconnected while running request: %s", req_str)
+            if req_str:
+                log.error("disconnected while running request: %s", req_str)
             if event:
                 log.error("was sending event: %s", event)
         except Exception as ex:
