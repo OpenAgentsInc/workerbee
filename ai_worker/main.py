@@ -261,6 +261,16 @@ class WorkerMain:
 
         return max(0, est_layers - self.conf.layer_offset)
 
+    def clear_llama_model():
+        if llama_cpp.server.app.llama:
+            # critical... must del this before creating a new app
+            llama_cpp.server.app.llama = None
+
+        self.llama = None
+        self.llama_cli = None
+        self.llama_model = None
+
+
     async def load_model(self, name):
         assert name, "No model name"
         if name == self.llama_model:
@@ -270,13 +280,14 @@ class WorkerMain:
 
         model_path = await self.get_model(name)
 
-        if llama_cpp.server.app.llama:
-            # critical... must del this before creating a new app
-            del llama_cpp.server.app.llama
-
         sp = None
         if self.conf.tensor_split:
             sp = [float(x) for x in self.conf.tensor_split.split(",")]
+        
+        self.clear_llama_model()
+        if self.sdxl:
+            self.sdxl.unload()
+ 
         settings = LlamaSettings(model=model_path, n_gpu_layers=await self.guess_layers(model_path), seed=-1,
                                  embedding=True, cache=True, port=8181,
                                  main_gpu=self.conf.main_gpu, tensor_split=sp)
@@ -413,6 +424,9 @@ class WorkerMain:
 
             st = time.monotonic()
             if req.openai_url == "/v1/fine_tuning/jobs":
+                self.clear_llama_model()
+                if self.sdxl:
+                    self.sdxl.unload()
                 async for event in self.fine_tuner.fine_tune(req.openai_req):
                     await self.ws_send(json.dumps(event), True)
                 await self.ws_send("{}")
@@ -448,6 +462,7 @@ class WorkerMain:
                 log.exception("error reporting error: %s", str(ex))
 
     async def handle_image_generation(self, request_data):
+        self.clear_llama_model()
         res = await self.sdxl.handle_request(request_data)
         ImageResponse.model_validatate(res)
         await self.send_response(res)
