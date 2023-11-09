@@ -83,7 +83,7 @@ class _SDXL:
             buffered = BytesIO()
             img.save(buffered, format="JPEG")
             img_str = base64.b64encode(buffered.getvalue())
-            data.append({"object": "image", "index": idx, "data": img_str})
+            data.append({"b64_json": img_str})
         
         ret = {
                "created": int(time.time()),

@@ -51,5 +51,4 @@ async def test_imagegen_simple(sdxl_inst: "SDXL"):
     result = await sdxl_inst.handle_req(req)
     log.debug(result)
     assert result["object"] == "list"
-    assert result["data"][0]["object"] == "image"
-    assert result["data"][0]["index"] == 0
+    assert "b64_json" in result["data"][0]

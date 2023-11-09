@@ -118,9 +118,8 @@ class ImageRequest(BaseModel):
 
 
 class ImageData(BaseModel):
-    object: str
-    index: int
-    data: str
+    b64_json: str
+    revised_prompt: Optional[str] = None
 
 
 class ImageResponse(BaseModel):
