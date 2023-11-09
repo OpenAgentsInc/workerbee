@@ -15,11 +15,13 @@ if typing.TYPE_CHECKING:
     from PIL import Image
 
 class _SDXL:
-    def __init__(self, pipe, conf):
+    def __init__(self, *, pipe, torch, conf):
         self.pipe = pipe
+        self.torch = torch
         self.conf = conf
         self.base = None
         self.model = None
+        self.device = self.torch.device("cuda" if self.torch.cuda.is_available() else "cpu")
        
     async def preload(self):
         # loasd then unload
@@ -46,15 +48,15 @@ class _SDXL:
                     if not download_only:
                         base = self.pipe.from_pretrained(tmp)
                 else:
-                    base = await loop.run_in_executor(lambda: self.pipe.from_pretrained(model, trust_remote_code=False, export=True))
+                    base = await loop.run_in_executor(None, lambda: self.pipe.from_pretrained(model, trust_remote_code=False, export=True))
                     base.save_pretrained(tmp)
             else:
                 if not download_only:
                     base = self.pipe.from_pretrained(tmp)
 
             if not download_only:
-                log.info("moving sdxl to cuda")
-                base.to("cuda")
+                log.info("moving sdxl to %s", self.device)
+                base.to(self.device)
                 self.base = base
                 self.model = model
 
@@ -106,12 +108,12 @@ def SDXL(conf) -> Optional[_SDXL]:
     try:
         if "sdxl" not in conf.enable:
             return None
-        from optimum.onnxruntime import ORTStableDiffusionXLPipeline
-        import onnxruntime as ort
-        if ort.get_device() != "GPU" and not os.environ.get("CI"):
-            log.exception("sdxl not enabled, ort runtime does not see the GPU")
-            return None
-        return _SDXL(ORTStableDiffusionXLPipeline, conf)
+
+        from diffusers import StableDiffusionXLPipeline
+        import torch
+        if not torch.cuda.is_available() and not os.environ.get("CI"):
+            log.exception("SDXL not enabled, PyTorch does not see the GPU")
+        return _SDXL(pipe=StableDiffusionXLPipeline, torch=torch, conf=conf)
     except ImportError:
         if os.environ.get("GPUTOPIA_DEBUG_IMPORT"):
             log.exception("sdxl not enabled")

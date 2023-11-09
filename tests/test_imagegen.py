@@ -10,7 +10,7 @@ from ai_worker.sdxl import SDXL
 
 
 @pytest.fixture
-def sdxl_onnx():
+def sdxl_cuda():
     conf = Config(enable=["sdxl"])
     yield SDXL(conf)
 
@@ -19,7 +19,8 @@ def sdxl_onnx():
 def sdxl_mocked(monkeypatch):
     mod = MagicMock()
     monkeypatch.setitem(sys.modules, 'PIL', mod)
-    monkeypatch.setitem(sys.modules, 'optimum.onnxruntime', mod)
+    monkeypatch.setitem(sys.modules, 'torch', mod)
+    monkeypatch.setitem(sys.modules, 'diffusers', mod)
 
     import ai_worker.sdxl
     importlib.reload(ai_worker.sdxl)
@@ -38,10 +39,10 @@ def sdxl_mocked(monkeypatch):
     importlib.reload(ai_worker.sdxl)
 
 
-@pytest.fixture(params=["onnx", "mocked"])
+@pytest.fixture(params=["cuda", "mocked"])
 def sdxl_inst(request):
-    if request.param == "onnx" and not request.config.getoption("--run-onnx"):
-        pytest.skip("sdxl onnx requires --run-onnx option to run")
+    if request.param == "cuda" and not request.config.getoption("--run-cuda"):
+        pytest.skip("sdxl cuda requires --run-cuda option to run")
     return request.getfixturevalue("sdxl_" + request.param)
 
 
