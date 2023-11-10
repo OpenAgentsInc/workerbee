@@ -47,7 +47,7 @@ def sdxl_inst(request):
 
 
 async def test_imagegen_simple(sdxl_inst: "SDXL"):
-    req = {"prompt": "a dog", "n": 1, "size": "1024x1024", "hyperparameters": {"steps": 4}}
+    req = {"model": "gputopia/nightvision-xl", "prompt": "a dog", "n": 1, "size": "1024x1024", "hyperparameters": {"steps": 4}}
     result = await sdxl_inst.handle_req(req)
     log.debug(result)
     assert result["created"]
