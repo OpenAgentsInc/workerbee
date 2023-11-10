@@ -103,7 +103,7 @@ class _SDXL:
         
         for idx, img in enumerate(images):
             buffered = BytesIO()
-            img.save(buffered, format="JPEG")
+            img.save(buffered, format="PNG")
             img_str = base64.b64encode(buffered.getvalue()).decode()
             data.append({"b64_json": img_str})
         
