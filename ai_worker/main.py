@@ -464,9 +464,8 @@ class WorkerMain:
 
     async def handle_image_generation(self, request_data):
         self.clear_llama_model()
-        res = await self.sdxl.handle_request(request_data)
-        ImageResponse.model_validatate(res)
-        await self.send_response(res)
+        res = await self.sdxl.handle_req(request_data)
+        await self.ws_send(json.dumps(res), True)
 
     async def get_model(self, name):
         return await self.download_model(name)

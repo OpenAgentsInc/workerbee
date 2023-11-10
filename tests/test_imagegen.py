@@ -3,6 +3,7 @@ import sys
 import logging as log
 import pytest
 import json
+import base64
 from unittest.mock import MagicMock
 
 from ai_worker.main import Config
@@ -52,3 +53,6 @@ async def test_imagegen_simple(sdxl_inst: "SDXL"):
     log.debug(result)
     assert result["created"]
     assert "b64_json" in result["data"][0]
+    assert isinstance(result["data"][0]["b64_json"], str)
+    assert base64.b64decode(result["data"][0]["b64_json"])
+        
