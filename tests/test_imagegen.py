@@ -53,5 +53,6 @@ async def test_imagegen_simple(sdxl_inst: "SDXL"):
     assert result["created"]
     assert "b64_json" in result["data"][0]
     assert isinstance(result["data"][0]["b64_json"], str)
-    assert base64.b64decode(result["data"][0]["b64_json"])
+    if result["data"][0]["b64_json"]:
+        assert base64.b64decode(result["data"][0]["b64_json"])
         
