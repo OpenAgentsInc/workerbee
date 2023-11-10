@@ -43,7 +43,7 @@ class _SDXL:
                     url = "https://gputopia.s3.amazonaws.com/models/sdxl.tar.gz"
                 if url:
                     await download_file(url, tmp + ".tar.gz")
-                    await loop.run_in_executor(lambda: gunzip(tmp + ".tar.gz"))
+                    await loop.run_in_executor(None, lambda: gunzip(tmp + ".tar.gz"))
                     if not download_only:
                         base = self.pipe.from_pretrained(tmp)
                 else:
