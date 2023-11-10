@@ -45,7 +45,7 @@ class _SDXL:
                
                 # todo: normalize this
                 if model == "gputopia/sdxl":
-                    model = "stabilityai/stable-diffusion-xl-base-1.0":
+                    model = "stabilityai/stable-diffusion-xl-base-1.0"
                 
                 if model == "stabilityai/stable-diffusion-xl-base-1.0":
                     url = "https://gputopia.s3.amazonaws.com/models/sdxl.tar.gz"
