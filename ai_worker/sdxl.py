@@ -21,7 +21,9 @@ class _SDXL:
         self.base = None
         self.model = None
         self.device = self.torch.device("cuda" if self.torch.cuda.is_available() else "cpu")
-       
+        self.loaded = False
+        self.loading = False
+
     async def preload(self):
         # loasd then unload
         await self.load("stabilityai/stable-diffusion-xl-base-1.0", download_only=True)
@@ -32,8 +34,9 @@ class _SDXL:
         self.model = None
 
     async def load(self, model, download_only=False):
+        assert not self.loading
+        self.loading = True
         loop = asyncio.get_running_loop()
-
         if model != self.model:
             tmp = url_to_tempfile(self.conf, model, prefix="sdxl.")
             base = None
@@ -58,6 +61,8 @@ class _SDXL:
                 base.to(self.device)
                 self.base = base
                 self.model = model
+        self.loading = False
+        self.loaded = True
 
     def temp_file(self, name, wipe=False):
         ret = os.path.join(self.conf.tmp_dir, name)
@@ -65,7 +70,7 @@ class _SDXL:
 
     async def handle_req(self, req):
         await self.load("stabilityai/stable-diffusion-xl-base-1.0")
-    
+         
         sz = req.get("size", "1024x1024")
         w, h = sz.split("x")
         
