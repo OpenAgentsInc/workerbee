@@ -87,7 +87,7 @@ async def download_file(url: str, output_file: str) -> str:
         with open(output_file + ".tmp", "wb") as fh:
             async with AsyncClient() as cli:
                 async with cli.stream("GET", url) as res:
-                    assert res.status_code == 200
+                    assert res.status_code == 200, f"download failed: {url} -> {output_file}"
                     async for chunk in res.aiter_bytes():
                         fh.write(chunk)
         os.replace(output_file + ".tmp", output_file)

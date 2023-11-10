@@ -42,8 +42,18 @@ class _SDXL:
             base = None
             if not os.path.exists(tmp):
                 url = None
+               
+                # todo: normalize this
+                if model == "gputopia/sdxl":
+                    model = "stabilityai/stable-diffusion-xl-base-1.0":
+                
                 if model == "stabilityai/stable-diffusion-xl-base-1.0":
                     url = "https://gputopia.s3.amazonaws.com/models/sdxl.tar.gz"
+                
+                if model.startswith("gputopia/"):
+                    name = model[9:]
+                    url = f"https://gputopia.s3.amazonaws.com/models/{name}.tar.gz"
+                
                 if url:
                     await download_file(url, tmp + ".tar.gz")
                     await loop.run_in_executor(None, lambda: gunzip(tmp + ".tar.gz"))
@@ -69,7 +79,7 @@ class _SDXL:
         return ret
 
     async def handle_req(self, req):
-        await self.load("stabilityai/stable-diffusion-xl-base-1.0")
+        await self.load(req.model)
          
         sz = req.get("size", "1024x1024")
         w, h = sz.split("x")
