@@ -79,7 +79,7 @@ class _SDXL:
         return ret
 
     async def handle_req(self, req):
-        await self.load(req.model)
+        await self.load(req["model"])
          
         sz = req.get("size", "1024x1024")
         w, h = sz.split("x")
@@ -88,8 +88,16 @@ class _SDXL:
         h = int(h)
         
         n = req.get("n", 1)
+       
+        prompt = req["prompt"]
+        neg = req.get("negative_prompt")
         
-        images = self.run(req.get("prompt"), n, w, h, req.get("hyperparameters", {}))
+        if not neg:
+            neg = ["bad teeth", "cartoon", "blurry", "cropped", "ugly"]
+            neg = [k for k in neg if k not in prompt]
+            neg = ", ".join(neg)
+        
+        images = self.run(prompt, neg, n, w, h, req.get("hyperparameters", {}))
        
         data = []
         
@@ -108,12 +116,13 @@ class _SDXL:
     def run(
             self,
             prompt: str,
+            negative_prompt: str,
             n: int,
             width: int,
             height: int,
             hp: dict
     ) -> list["Image"]:
-        ret = self.base(prompt=prompt, width=width, height=height, num_images_per_prompt=n, num_inference_steps=hp.get("steps", 50))
+        ret = self.base(prompt=prompt, negative_prompt=negative_prompt, width=width, height=height, num_images_per_prompt=n, num_inference_steps=hp.get("steps", 50))
         return ret.images
 
 
