@@ -5,7 +5,6 @@ import time
 import asyncio
 
 from io import BytesIO
-from hashlib import md5
 from typing import Optional
 import logging as log
 

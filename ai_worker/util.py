@@ -87,7 +87,6 @@ async def download_file(url: str, output_file: str) -> str:
         with open(output_file + ".tmp", "wb") as fh:
             async with AsyncClient() as cli:
                 async with cli.stream("GET", url) as res:
-                    res: Response
                     assert res.status_code == 200, res.text
                     async for chunk in res.aiter_bytes():
                         fh.write(chunk)

@@ -2,7 +2,6 @@ import importlib
 import sys
 import logging as log
 import pytest
-import json
 import base64
 from unittest.mock import MagicMock
 
