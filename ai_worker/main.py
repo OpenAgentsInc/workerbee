@@ -12,7 +12,7 @@ import tempfile
 import time
 from hashlib import sha256, md5
 from pprint import pprint
-from typing import Optional, List
+from typing import Optional, List, Literal, Any
 from base64 import urlsafe_b64encode as b64encode, urlsafe_b64decode as b64decode
 import psutil
 import websockets
@@ -26,7 +26,7 @@ from pynvml.smi import nvidia_smi
 import pyopencl
 from dotenv import load_dotenv
 
-from .util import user_ft_name_to_url, url_to_tempfile, USER_PREFIX
+from .util import user_ft_name_to_url, url_to_tempfile, USER_PREFIX, schedule_task
 
 log = logging.getLogger(__name__)
 
@@ -37,8 +37,9 @@ except ImportError:
         log.exception("fine tuning not enabled")
     FineTuner = None
 
-from .fast_embed import FastEmbed, MODEL_PREFIX
+from ai_worker.sdxl import SDXL
 
+from .fast_embed import FastEmbed, MODEL_PREFIX
 from gguf_loader.main import get_size
 
 from .gguf_reader import GGUFReader
@@ -106,7 +107,24 @@ class Config(BaseSettings):
                          description="temp folder for data files and checkpoints")
 
     config: str = Field(os.path.expanduser("~/.config/gputopia"), description="config file location")
+    enable: list[Literal["sdxl"]] = Field([], description="List of optional models to enable")
     privkey: str = Field("", description=argparse.SUPPRESS, exclude=True)
+
+class ImageRequest(BaseModel):
+    prompt: str
+    size: str = "1024x1024"
+    n: int = 1
+    hyperparameters: dict[str, Any] = {}
+
+
+class ImageData(BaseModel):
+    b64_json: str
+    revised_prompt: Optional[str] = None
+
+
+class ImageResponse(BaseModel):
+    created: int
+    data: List[ImageData]
 
 
 def get_free_space_mb(dirname):
@@ -142,9 +160,9 @@ class WorkerMain:
             self.fine_tuner = FineTuner(self.conf)
         else:
             self.fine_tuner = None
-
+        self.sdxl = SDXL(self.conf)
         self.fast_embed = FastEmbed(self.conf)
-
+        
     def _gen_or_load_priv(self) -> None:
         if not self.conf.privkey:
             cfg = self.conf.config
@@ -204,6 +222,10 @@ class WorkerMain:
             await self.test_model()
             return
 
+        # in the background, download the model
+        if self.sdxl:
+            schedule_task(self.sdxl.preload())
+
         await self.run_ws()
 
     async def guess_layers(self, model_path):
@@ -239,6 +261,16 @@ class WorkerMain:
 
         return max(0, est_layers - self.conf.layer_offset)
 
+    def clear_llama_model(self):
+        if llama_cpp.server.app.llama:
+            # critical... must del this before creating a new app
+            llama_cpp.server.app.llama = None
+
+        self.llama = None
+        self.llama_cli = None
+        self.llama_model = None
+
+
     async def load_model(self, name):
         assert name, "No model name"
         if name == self.llama_model:
@@ -248,13 +280,14 @@ class WorkerMain:
 
         model_path = await self.get_model(name)
 
-        if llama_cpp.server.app.llama:
-            # critical... must del this before creating a new app
-            del llama_cpp.server.app.llama
-
         sp = None
         if self.conf.tensor_split:
             sp = [float(x) for x in self.conf.tensor_split.split(",")]
+        
+        self.clear_llama_model()
+        if self.sdxl:
+            self.sdxl.unload()
+ 
         settings = LlamaSettings(model=model_path, n_gpu_layers=await self.guess_layers(model_path), seed=-1,
                                  embedding=True, cache=True, port=8181,
                                  main_gpu=self.conf.main_gpu, tensor_split=sp)
@@ -275,6 +308,9 @@ class WorkerMain:
 
         if self.fast_embed:
             caps += ["fast-embed"]
+        
+        if self.sdxl:
+            caps += ["sdxl"]
 
         model_list = self.get_model_list()
 
@@ -388,9 +424,14 @@ class WorkerMain:
 
             st = time.monotonic()
             if req.openai_url == "/v1/fine_tuning/jobs":
+                self.clear_llama_model()
+                if self.sdxl:
+                    self.sdxl.unload()
                 async for event in self.fine_tuner.fine_tune(req.openai_req):
                     await self.ws_send(json.dumps(event), True)
                 await self.ws_send("{}")
+            elif req.openai_url == "/v1/images/generations":
+                await self.handle_image_generation(req.openai_req)
             elif req.openai_url == "/v1/embeddings" and model.startswith(MODEL_PREFIX):
                 res = self.fast_embed.embed(req.openai_req)
                 await self.ws_send(json.dumps(res), True)
@@ -420,6 +461,11 @@ class WorkerMain:
                     await self.ws_send(json.dumps({"error": str(ex), "error_type": type(ex).__name__}), True)
             except Exception as ex:
                 log.exception("error reporting error: %s", str(ex))
+
+    async def handle_image_generation(self, request_data):
+        self.clear_llama_model()
+        res = await self.sdxl.handle_req(request_data)
+        await self.ws_send(json.dumps(res), True)
 
     async def get_model(self, name):
         return await self.download_model(name)
@@ -559,6 +605,8 @@ For example:
             args["default"] = field.default
         if field.annotation is bool:
             args.pop("type")
+        if name == "enable":
+            continue
         arg_names.append(name)
         parser.add_argument(f"--{name}", **args)
 
@@ -566,6 +614,11 @@ For example:
 
     # todo: back compat.   remove eventually
     parser.add_argument("--ln_url", type=str, help=argparse.SUPPRESS)
+    
+
+    # too annoying to deal with Listeral list
+    parser.add_argument("--enable", choices=["sdxl"], nargs="+")
+    arg_names.append("enable")
 
     args = parser.parse_args(args=argv)
 

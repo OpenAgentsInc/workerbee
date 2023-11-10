@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ai-worker"
-version = "0.3.0"
+version = "0.3.1"
 description = "An ai worker that posts capabilities, and accepts jobs"
 authors = ["erik aronesty <erik@q32.com>"]
 license = "MIT"
@@ -53,6 +53,8 @@ nvidia-nccl-cu12=">=2.18.1"
 nvidia-nvjitlink-cu12=">=12.3.52"
 nvidia-nvtx-cu12=">=12.1.105"
 triton = ">=2.1.0"
+diffusers = "^0.21.4"
+Pillow = "^10.1.0"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -71,13 +73,12 @@ optional = true
 [tool.poetry.group.onnx.dependencies]
 onnx = "^1.15.0"
 tqdm = "^4.66.1"
-onnxruntime-gpu = "^1.16.1"
+onnxruntime-gpu = "1.16.1"
+onnxruntime = "1.16.1"
 fastembed = "^0.1.1"
-
 
 [tool.poetry.group.dev-onnx]
 optional = true
-
 
 [tool.poetry.group.dev-onnx.dependencies]
 onnx = "^1.15.0"
