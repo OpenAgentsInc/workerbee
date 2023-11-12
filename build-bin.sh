@@ -36,6 +36,12 @@ rm -f ~/.cache/pypoetry/artifacts/*/*/*/*/llama*
 
 CMAKE_ARGS="$cmake" FORCE_CMAKE=1 poetry install $with_torch
 
+if [ "$gpu" == "cuda-torch" ]; then
+    # annoying hack because fastembed is probably a bad idea
+    pip install transformers==4.35.0
+    opts=""
+fi
+
 python build-version.py
 
 ./pyinstaller.sh $gpu-$arch $opts
