@@ -440,6 +440,19 @@ class WorkerMain:
                     await asyncio.sleep(1)
                     self.stopped = True
 
+    async def download_tmp_file(self, url: str) -> str:
+        import urllib.parse
+        res = urllib.parse.urlparse(self.conf.queen_url)
+        scheme = "https" if res.scheme == "wss" else "http"
+        async with AsyncClient() as cli:
+            async with cli.stream('GET', f"{scheme}://{res.netloc}/tmpfile/?filename={url}") as response:
+                with tempfile.NamedTemporaryFile("wb", delete=False) as download_file:
+                    async for chunk in response.aiter_bytes():
+                        download_file.write(chunk)
+                    download_file.close()
+                return download_file.name
+                
+
     async def run_one(self):
         event = None
         req_str = None
@@ -464,14 +477,14 @@ class WorkerMain:
                 await self.ws_send(json.dumps(res), True)
             elif req.openai_url == "/v1/audio/transcriptions":
                 await self.load_whisper_model(model)
-                print("Cosas")
-                file = open("../open-whisp/genesir-23-2.mp3", mode="rb")
+                filename = await self.download_tmp_file(req.openai_req["file"])
+                file = open(filename, "rb")
                 res = await self.whisper_cli.post(req.openai_url, files={"file": file.read()},data={
                     "language": "es",
                     "model": model})
                 print("asdasd")
                 print(res.text)
-                await self.ws_send(json.dumps(res), True)
+                await self.ws_send(json.dumps(res.json()), True)
             elif req.openai_req.get("stream"):
                 await self.load_model(model)
                 async with aconnect_sse(self.llama_cli, "POST", req.openai_url, json=req.openai_req) as sse:
