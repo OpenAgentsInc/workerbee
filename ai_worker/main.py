@@ -20,6 +20,8 @@ from httpx import Response, AsyncClient
 from httpx_sse import aconnect_sse
 from llama_cpp.server.app import Settings as LlamaSettings, create_app as create_llama_app
 import llama_cpp.server.app
+from whisper_cpp_python.server.app import Settings as WhisperSettings, create_app as create_whisper_app
+import whisper_cpp_python.server.app
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pynvml.smi import nvidia_smi
@@ -153,8 +155,11 @@ class WorkerMain:
             self.slug = ""
         self.stopped = False
         self.llama = None
+        self.whisper = None
         self.llama_model = None
+        self.whisper_model = None
         self.llama_cli: Optional[AsyncClient] = None
+        self.whisper_cli: Optional[AsyncClient] = None
 
         if FineTuner:
             self.fine_tuner = FineTuner(self.conf)
@@ -270,6 +275,27 @@ class WorkerMain:
         self.llama_cli = None
         self.llama_model = None
 
+    def clear_whisper_model(self):
+        if whisper_cpp_python.server.app.whisper:
+            # critical... must del this before creating a new app
+            whisper_cpp_python.server.app.whisper = None
+
+        self.whisper = None
+        self.whisper_cli = None
+        self.whisper_model = None
+
+    async def load_whisper_model(self, name):
+        assert name, "No model name"
+        if name == self.whisper_model:
+            return
+        log.debug("loading model: %s", name)
+
+        model_path = await self.get_model(name, engine="whisper")
+        whisper_settings = WhisperSettings(model=model_path)
+        self.whisper = create_whisper_app(whisper_settings)
+        assert self.whisper, "Load whisper failed.   Try lowering layers."
+        self.whisper_cli = AsyncClient(app=self.whisper, base_url="http://test")
+        self.whisper_model = name
 
     async def load_model(self, name):
         assert name, "No model name"
@@ -295,6 +321,7 @@ class WorkerMain:
         assert self.llama, "Load llama failed.   Try lowering layers."
         self.llama_cli = AsyncClient(app=self.llama, base_url="http://test")
         self.llama_model = name
+       
 
     def _get_connect_info(self) -> ConnectMessage:
         disk_space = get_free_space_mb(".")
@@ -302,6 +329,7 @@ class WorkerMain:
         caps = []
 
         caps += ['llama-infer']
+        caps += ["whisper"]
 
         if self.fine_tuner:
             caps += ["llama-fine-tune"]
@@ -419,7 +447,6 @@ class WorkerMain:
             req_str = await self.ws_recv()
             req = Req.model_validate_json(req_str)
             model = req.openai_req.get("model")
-
             log.debug("loading %s", model)
 
             st = time.monotonic()
@@ -434,6 +461,16 @@ class WorkerMain:
                 await self.handle_image_generation(req.openai_req)
             elif req.openai_url == "/v1/embeddings" and model.startswith(MODEL_PREFIX):
                 res = self.fast_embed.embed(req.openai_req)
+                await self.ws_send(json.dumps(res), True)
+            elif req.openai_url == "/v1/audio/transcriptions":
+                await self.load_whisper_model(model)
+                print("Cosas")
+                file = open("../open-whisp/genesir-23-2.mp3", mode="rb")
+                res = await self.whisper_cli.post(req.openai_url, files={"file": file.read()},data={
+                    "language": "es",
+                    "model": model})
+                print("asdasd")
+                print(res.text)
                 await self.ws_send(json.dumps(res), True)
             elif req.openai_req.get("stream"):
                 await self.load_model(model)
@@ -467,8 +504,11 @@ class WorkerMain:
         res = await self.sdxl.handle_req(request_data)
         await self.ws_send(json.dumps(res), True)
 
-    async def get_model(self, name):
-        return await self.download_model(name)
+    async def get_model(self, name, engine="llama"):
+        if engine == "llama":
+            return await self.download_model(name)
+        elif engine == "whisper":
+            return await self.download_whisper_model(name)
 
     async def download_file(self, url: str) -> str:
         output_file = url_to_tempfile(self.conf, url)
@@ -516,6 +556,26 @@ class WorkerMain:
         if not os.path.exists(output_file):
             return False
         return True
+
+    async def download_whisper_model(self, name):
+        # uses hf cache, so no need to handle here
+        orig_name = name
+
+        if name.startswith(USER_PREFIX):
+            name = user_ft_name_to_url(name)
+
+        if name.startswith("https:"):
+            ret = await self.download_file(name)
+            self.note_have(orig_name)
+            return ret
+        from ai_worker.ggml import download_ggml
+        # size = get_size(name)
+        # await self.free_up_space(size)
+        loop = asyncio.get_running_loop()
+        path = await loop.run_in_executor(None, lambda: download_ggml(name))
+        self.note_have(orig_name)
+
+        return path
 
     async def download_model(self, name):
         # uses hf cache, so no need to handle here

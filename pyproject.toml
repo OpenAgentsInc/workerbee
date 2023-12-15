@@ -26,6 +26,8 @@ pyopencl = "^2023.1.2"
 coincurve = "^18.0.0"
 # https://github.com/huggingface/datasets/issues/6330
 fsspec = "2023.9.2"
+whisper-cpp-python = "^0.2.0"
+python-multipart = "^0.0.6"
 
 [tool.poetry.group.torch]
 optional = true
