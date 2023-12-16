@@ -445,7 +445,7 @@ class WorkerMain:
         res = urllib.parse.urlparse(self.conf.queen_url)
         scheme = "https" if res.scheme == "wss" else "http"
         async with AsyncClient() as cli:
-            async with cli.stream('GET', f"{scheme}://{res.netloc}/tmpfile/?filename={url}") as response:
+            async with cli.stream('GET', f"{scheme}://{res.netloc}/storage/?filename={url}") as response:
                 with tempfile.NamedTemporaryFile("wb", delete=False) as download_file:
                     async for chunk in response.aiter_bytes():
                         download_file.write(chunk)
@@ -478,13 +478,11 @@ class WorkerMain:
             elif req.openai_url == "/v1/audio/transcriptions":
                 await self.load_whisper_model(model)
                 filename = await self.download_tmp_file(req.openai_req["file"])
-                file = open(filename, "rb")
-                res = await self.whisper_cli.post(req.openai_url, files={"file": file.read()},data={
-                    "language": "es",
-                    "model": model})
-                print("asdasd")
-                print(res.text)
-                await self.ws_send(json.dumps(res.json()), True)
+                with open(filename, "rb") as file:
+                    res = await self.whisper_cli.post(req.openai_url, files={"file": file.read()},data={
+                        "language": "es",
+                        "model": model})
+                    await self.ws_send(json.dumps(res.json()), True)
             elif req.openai_req.get("stream"):
                 await self.load_model(model)
                 async with aconnect_sse(self.llama_cli, "POST", req.openai_url, json=req.openai_req) as sse:
@@ -582,8 +580,10 @@ class WorkerMain:
             self.note_have(orig_name)
             return ret
         from ai_worker.ggml import download_ggml
-        # size = get_size(name)
-        # await self.free_up_space(size)
+        fname = f"ggml-{name}.bin"
+        repo = "ggerganov/whisper.cpp"
+        size = get_size("{repo}:{fname}")
+        await self.free_up_space(size)
         loop = asyncio.get_running_loop()
         path = await loop.run_in_executor(None, lambda: download_ggml(name))
         self.note_have(orig_name)
