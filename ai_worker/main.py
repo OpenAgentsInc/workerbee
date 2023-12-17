@@ -582,7 +582,7 @@ class WorkerMain:
         from ai_worker.ggml import download_ggml
         fname = f"ggml-{name}.bin"
         repo = "ggerganov/whisper.cpp"
-        size = get_size("{repo}:{fname}")
+        size = get_size(f"{repo}:{fname}")
         await self.free_up_space(size)
         loop = asyncio.get_running_loop()
         path = await loop.run_in_executor(None, lambda: download_ggml(name))

@@ -3614,15 +3614,20 @@ files = [
 [[package]]
 name = "whisper-cpp-python"
 version = "0.2.0"
-description = "A Python wrapper for whisper.cpp"
+description = "Python bindings for the whisper.cpp library"
 optional = false
-python-versions = ">=3.9"
-files = [
-    {file = "whisper_cpp_python-0.2.0.tar.gz", hash = "sha256:4e727040711d9f8adc3767f786525ba1543b5dd34e3a851880a953933b402f55"},
-]
+python-versions = "^3.9"
+files = []
+develop = false
 
 [package.dependencies]
-librosa = ">=0.10.0.post2,<0.11.0"
+librosa = "^0.10.0.post2"
+
+[package.source]
+type = "git"
+url = "https://github.com/gonzafirewall/whisper-cpp-python.git"
+reference = "HEAD"
+resolved_reference = "fa9ecf9b521662660ff53f88c7b2277c9872afa2"
 
 [[package]]
 name = "xxhash"
@@ -3846,4 +3851,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.12"
-content-hash = "fd8f20ddefc18bc5f6e407592927ae0c22b812276d9d89fcc0290f29ecbbd2a2"
+content-hash = "915b9d3f330205380fc09d840411d353fabb4377e2ae3dee239abaf3e2d18ae8"
