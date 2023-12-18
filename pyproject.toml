@@ -27,7 +27,7 @@ coincurve = "^18.0.0"
 # https://github.com/huggingface/datasets/issues/6330
 fsspec = "2023.9.2"
 python-multipart = "^0.0.6"
-whisper-cpp-python = {git = "https://github.com/gonzafirewall/whisper-cpp-python.git"}
+openai-whisper = "^20231117"
 
 [tool.poetry.group.torch]
 optional = true
