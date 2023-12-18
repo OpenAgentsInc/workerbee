@@ -467,8 +467,10 @@ class WorkerMain:
             elif req.openai_url == "/v1/audio/transcriptions":
                 await self.load_whisper_model(model)
                 filename = await self.download_tmp_file(req.openai_req["file"])
-                result = self.whisper.transcribe(filename)
-                await self.ws_send(json.dumps({"text": result.text}), True)
+                # whisper.transcribe is not async wrap it to make it works
+                loop = asyncio.get_running_loop()
+                result = await loop.run_in_executor(None, lambda: self.whisper.transcribe(filename))
+                await self.ws_send(json.dumps({"text": result["text"]}), True)
             elif req.openai_req.get("stream"):
                 await self.load_model(model)
                 async with aconnect_sse(self.llama_cli, "POST", req.openai_url, json=req.openai_req) as sse:
