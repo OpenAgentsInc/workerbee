@@ -21,7 +21,6 @@ elif os.name == 'posix':  # Linux/Mac
     datas.append((so_path, '.'))
 
 
-package_path = get_package_paths('whisper')[0]
-assets = os.path.join(package_path, 'assets')
+assets = os.path.join("whisper", 'assets')
 datas.append((assets, './whisper/assets'))
     
