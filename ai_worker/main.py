@@ -553,28 +553,6 @@ class WorkerMain:
             return False
         return True
 
-    async def download_whisper_model(self, name):
-        # uses hf cache, so no need to handle here
-        orig_name = name
-
-        if name.startswith(USER_PREFIX):
-            name = user_ft_name_to_url(name)
-
-        if name.startswith("https:"):
-            ret = await self.download_file(name)
-            self.note_have(orig_name)
-            return ret
-        from ai_worker.ggml import download_ggml
-        fname = f"ggml-{name}.bin"
-        repo = "ggerganov/whisper.cpp"
-        size = get_size(f"{repo}:{fname}")
-        await self.free_up_space(size)
-        loop = asyncio.get_running_loop()
-        path = await loop.run_in_executor(None, lambda: download_ggml(name))
-        self.note_have(orig_name)
-
-        return path
-
     async def download_model(self, name):
         # uses hf cache, so no need to handle here
         orig_name = name
