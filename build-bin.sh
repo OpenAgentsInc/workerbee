@@ -3,7 +3,7 @@
 gpu="$1"
 arch="$2"
 cmake="$3"
-opts="--onefile"
+opts="--onedir"
 
 if [ -z "$cmake" -o -z "$gpu" ]; then
     echo usage build-bin.sh gpu arch "cmake-args"
