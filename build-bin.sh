@@ -3,7 +3,7 @@
 gpu="$1"
 arch="$2"
 cmake="$3"
-opts="--onefile"
+opts="--onedir"
 
 if [ -z "$cmake" -o -z "$gpu" ]; then
     echo usage build-bin.sh gpu arch "cmake-args"
@@ -35,6 +35,8 @@ rm -f ~/AppData/Local/pypoetry/Cache/artifacts/*/*/*/*/llama*
 rm -f ~/.cache/pypoetry/artifacts/*/*/*/*/llama*
 
 CMAKE_ARGS="$cmake" FORCE_CMAKE=1 poetry install $with_torch
+
+poetry run pip install openai-whisper
 
 if [ "$gpu" == "cuda-torch" ]; then
     # annoying hack because fastembed is probably a bad idea

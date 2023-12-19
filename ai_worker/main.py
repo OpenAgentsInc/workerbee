@@ -20,6 +20,7 @@ from httpx import Response, AsyncClient
 from httpx_sse import aconnect_sse
 from llama_cpp.server.app import Settings as LlamaSettings, create_app as create_llama_app
 import llama_cpp.server.app
+import whisper
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pynvml.smi import nvidia_smi
@@ -153,9 +154,11 @@ class WorkerMain:
             self.slug = ""
         self.stopped = False
         self.llama = None
+        self.whisper = None
         self.llama_model = None
+        self.whisper_model = None
         self.llama_cli: Optional[AsyncClient] = None
-
+        
         if FineTuner:
             self.fine_tuner = FineTuner(self.conf)
         else:
@@ -270,6 +273,18 @@ class WorkerMain:
         self.llama_cli = None
         self.llama_model = None
 
+    def clear_whisper_model(self):
+        self.whisper = None
+        self.whisper_model = None
+
+    async def load_whisper_model(self, name):
+        assert name, "No model name"
+        if name == self.whisper_model:
+            return
+        log.debug("loading model: %s", name)
+
+        self.whisper = whisper.load_model(name)
+        self.whisper_model = name
 
     async def load_model(self, name):
         assert name, "No model name"
@@ -295,6 +310,7 @@ class WorkerMain:
         assert self.llama, "Load llama failed.   Try lowering layers."
         self.llama_cli = AsyncClient(app=self.llama, base_url="http://test")
         self.llama_model = name
+       
 
     def _get_connect_info(self) -> ConnectMessage:
         disk_space = get_free_space_mb(".")
@@ -302,6 +318,7 @@ class WorkerMain:
         caps = []
 
         caps += ['llama-infer']
+        caps += ["whisper"]
 
         if self.fine_tuner:
             caps += ["llama-fine-tune"]
@@ -412,6 +429,19 @@ class WorkerMain:
                     await asyncio.sleep(1)
                     self.stopped = True
 
+    async def download_tmp_file(self, url: str) -> str:
+        import urllib.parse
+        res = urllib.parse.urlparse(self.conf.queen_url)
+        scheme = "https" if res.scheme == "wss" else "http"
+        async with AsyncClient() as cli:
+            async with cli.stream('GET', f"{scheme}://{res.netloc}/storage/?filename={url}") as response:
+                with tempfile.NamedTemporaryFile("wb", delete=False) as download_file:
+                    async for chunk in response.aiter_bytes():
+                        download_file.write(chunk)
+                    download_file.close()
+                return download_file.name
+                
+
     async def run_one(self):
         event = None
         req_str = None
@@ -419,7 +449,6 @@ class WorkerMain:
             req_str = await self.ws_recv()
             req = Req.model_validate_json(req_str)
             model = req.openai_req.get("model")
-
             log.debug("loading %s", model)
 
             st = time.monotonic()
@@ -435,6 +464,13 @@ class WorkerMain:
             elif req.openai_url == "/v1/embeddings" and model.startswith(MODEL_PREFIX):
                 res = self.fast_embed.embed(req.openai_req)
                 await self.ws_send(json.dumps(res), True)
+            elif req.openai_url == "/v1/audio/transcriptions":
+                await self.load_whisper_model(model)
+                filename = await self.download_tmp_file(req.openai_req["file"])
+                # whisper.transcribe is not async wrap it to make it works
+                loop = asyncio.get_running_loop()
+                result = await loop.run_in_executor(None, lambda: self.whisper.transcribe(filename))
+                await self.ws_send(json.dumps({"text": result["text"]}), True)
             elif req.openai_req.get("stream"):
                 await self.load_model(model)
                 async with aconnect_sse(self.llama_cli, "POST", req.openai_url, json=req.openai_req) as sse:
@@ -469,7 +505,7 @@ class WorkerMain:
 
     async def get_model(self, name):
         return await self.download_model(name)
-
+        
     async def download_file(self, url: str) -> str:
         output_file = url_to_tempfile(self.conf, url)
         if not os.path.exists(output_file):
